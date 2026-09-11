@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: gitbot-postgres
+    environment:
+      POSTGRES_DB: gitbot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 3003
+    ports:
+      - "5433:5432"
+    volumes:
+      - gitbot_pg_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gitbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gitbot_pg_data:
+
+
+
+# by default every container is on same network in one something.yaml file

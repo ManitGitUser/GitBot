@@ -9,8 +9,7 @@ public class GitBotApplication {
     public static void main(String[] args) {
 
         SpringApplication.run(GitBotApplication.class, args);
-        //
-         // new commit
+
     }
 
 }

@@ -31,11 +31,11 @@ spring:
       embedding:
         model: text-embedding-3-small
 
-    vectorstore:
-      pgvector:
-        initialize-schema: true
-        index-type: HNSW
-        distance-type: COSINE_DISTANCE
+#    vectorstore:
+#      pgvector:
+#        initialize-schema: true
+#        index-type: HNSW
+#        distance-type: COSINE_DISTANCE
 
   security:
     oauth2:
@@ -64,6 +64,7 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   token-encryptor-password: ${TOKEN_ENCRYPTOR_PASSWORD:gitbot-local-encrypt-key-change-me}
+  token-encryptor-salt: ${TOKEN_ENCRYPTOR_SALT:gitbot-local-salt-change-me}
   indexing:
     max-file-bytes: 102400
     chunk-size: 800

@@ -28,7 +28,7 @@ setup backend /entity/User, /repository/UserRepository, /service/UserService.
 
 setup backend /exception/BadRequestException, /exception/NotFoundException, /exception/UnauthorizedException, /exception/GlobalExceptionHandler
 
-setup backend /config/SecurityConfiguration for securityfilterchain
+setup backend /config/SecurityConfig for securityfilterchain
 
 setup backend /security/GitHubOAuth2UserService which implements default OAuth2UserService to load new user with upsert using /backend/security/AppUserPrinicipal which implements OAuth2User
 

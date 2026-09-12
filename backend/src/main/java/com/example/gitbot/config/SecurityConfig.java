@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class SecurityConfiguration {
+public class SecurityConfig {
 
     private final GitHubOAuth2UserService gitHubOAuth2UserService;
 

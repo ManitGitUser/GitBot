@@ -43,7 +43,7 @@ public class UserService {
 
         Long githubId = toLong(attributes.get("id"));
         String login = String.valueOf(attributes.get("login"));
-        String name = attributes.get("name").toString() != null
+        String name = attributes.get("name") != null
                         ?
                         attributes.get("name").toString()
                         : login ;

@@ -31,6 +31,12 @@ setup backend /exception/BadRequestException, /exception/NotFoundException, /exc
 setup backend /config/SecurityConfig for securityfilterchain
 
 setup backend /security/GitHubOAuth2UserService which implements default OAuth2UserService to load new user with upsert using /backend/security/AppUserPrinicipal which implements OAuth2User
+added backend /security/CurrentUser to validate auth in SecurityContext of AppUserPrincipal
 
+configured backend /config/CorsConfig and /config/CryptoConfig for cors config source and token encryptor
+
+setup backend /controller/AuthController for api endpoints
+
+created record dto for UserResponse at backend /dto/UserResponse
 
 

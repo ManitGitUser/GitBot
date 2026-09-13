@@ -44,3 +44,11 @@ created client /app/login/page.tsx for login dashboard
 
 added client /lib/api.ts for user type and apis : user, repository, indexstatus, chatsession, citation, chatmessage, api, errors.
 
+added client /components/icons/gitbot-icon.tsx, github-icom.tsx, language-icon.tsx
+also :-
+/components/layout/app-shell.tsx
+/app/auth/callback/page.tsx
+/app/login/page.tsx
+/app/dashboard/page.tsx
+/hooks/use-auth.ts
+/lib/query-keys.ts

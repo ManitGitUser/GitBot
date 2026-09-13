@@ -43,3 +43,4 @@ now on to client
 created client /app/login/page.tsx for login dashboard
 
 added client /lib/api.ts for user type and apis : user, repository, indexstatus, chatsession, citation, chatmessage, api, errors.
+

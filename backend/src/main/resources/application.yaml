@@ -42,8 +42,8 @@ spring:
       client:
         registration:
           github:
-            client-id: ${GITHUB_CLIENT_ID}
-            client-secret: ${GITHUB_CLIENT_SECRET:}
+            client-id: ${GITHUB_CLIENT_ID:Ov23li6IQoNRiJiAXbuSs}
+            client-secret: ${GITHUB_CLIENT_SECRET:9ebe0ac496bc81f04c5713335e62f165f0204810}
             scope:
               - read:user,repo
         provider:
@@ -64,7 +64,7 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   token-encryptor-password: ${TOKEN_ENCRYPTOR_PASSWORD:gitbot-local-encrypt-key-change-me}
-  token-encryptor-salt: ${TOKEN_ENCRYPTOR_SALT:gitbot-local-salt-change-me}
+  token-encryptor-salt: ${TOKEN_ENCRYPTOR_SALT:a1b2c3d4e5f6}
   indexing:
     max-file-bytes: 102400
     chunk-size: 800

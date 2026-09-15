@@ -56,3 +56,14 @@ also :-
 /hooks/use-auth.ts
 /lib/query-keys.ts
 /proxy.ts
+(overall created landing, login & dashboard pages)
+
+created githubrepo entity at backend /entity/GitRepo and githubrepo repository at /repository/GitRepoRepository
+
+created backend /enums/IndexStatus for indexing status 
+
+created response dtos at backend /dto/GitRepoResponnse and /dto/IndexStatusResponse.
+
+added github specific service in backend /service/github/GitHubApiClient and /service/github/GitHubRateLimiter and /service/GitRepoService
+
+added repo controller at backend /controller/GitRepoController

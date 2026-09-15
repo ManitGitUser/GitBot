@@ -67,3 +67,10 @@ created response dtos at backend /dto/GitRepoResponnse and /dto/IndexStatusRespo
 added github specific service in backend /service/github/GitHubApiClient and /service/github/GitHubRateLimiter and /service/GitRepoService
 
 added repo controller at backend /controller/GitRepoController
+
+
+back to client
+added hook at client /hooks/use-repos.ts
+
+created dashboard componenets at client /components/dashboard/dashboard-header.tsx, index-error-alert.tsx, language-badge.tsx, overview-dashboard.tsx, repo-card.tsx, repo-dashboard.tsx, repo-status.tsx, settings-dashboard.tsx
+

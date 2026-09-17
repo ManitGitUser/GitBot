@@ -72,5 +72,15 @@ added repo controller at backend /controller/GitRepoController
 back to client
 added hook at client /hooks/use-repos.ts
 
-created dashboard componenets at client /components/dashboard/dashboard-header.tsx, index-error-alert.tsx, language-badge.tsx, overview-dashboard.tsx, repo-card.tsx, repo-dashboard.tsx, repo-status.tsx, settings-dashboard.tsx
+created dashboard components at client /components/dashboard/dashboard-header.tsx, index-error-alert.tsx, language-badge.tsx, overview-dashboard.tsx, repo-card.tsx, repo-dashboard.tsx, repo-status.tsx, settings-dashboard.tsx
+
+
+back to backend
+configured openai api key in application.yaml and other configurations related to spring ai, pgvector, chunking
+
+configured for App beans at backend /config/AppConfig for rest client and ThreadExecutor for asynchronous indexing
+
+added file filters while indexing at backend /service/indexing/CodeFileFilter and /service/indexing/CodeChunker for service/indexing/IndexService
+
+configured rag at backend /service/ai/RagSettings
 

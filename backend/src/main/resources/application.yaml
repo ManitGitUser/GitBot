@@ -2,10 +2,13 @@ spring:
   application:
     name: GitBot
 
+  config:
+    import: "optional:file:backend/.env[.properties]"
+
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/gitbot}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:3003}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,28 +25,36 @@ spring:
 #    locations: classpath:db/migration
 #    baseline-on-migrate: true
 
-
   ai:
+#    google:
+#      genai:
+#        api-key: ${GEMINI_API_KEY}
+#        chat:
+#          model: gemini-2.5-flash
+#        embedding:
+#          text:
+#            model: gemini-embedding-001
+#            dimensions: 1536
     openai:
       api-key: ${OPENAI_API_KEY}
       chat:
         model: gpt-4o-mini
       embedding:
         model: text-embedding-3-small
-
-#    vectorstore:
-#      pgvector:
-#        initialize-schema: true
-#        index-type: HNSW
-#        distance-type: COSINE_DISTANCE
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
 
   security:
     oauth2:
       client:
         registration:
           github:
-            client-id: ${GITHUB_CLIENT_ID:Ov23li6IQoNRiJiAXbuSs}
-            client-secret: ${GITHUB_CLIENT_SECRET:9ebe0ac496bc81f04c5713335e62f165f0204810}
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
             scope:
               - read:user,repo
         provider:
@@ -60,11 +71,11 @@ server:
       timeout: 7d
 
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
-  token-encryptor-password: ${TOKEN_ENCRYPTOR_PASSWORD:gitbot-local-encrypt-key-change-me}
-  token-encryptor-salt: ${TOKEN_ENCRYPTOR_SALT:a1b2c3d4e5f6}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  token-encryptor-password: ${TOKEN_ENCRYPTOR_PASSWORD}
+  token-encryptor-salt: ${TOKEN_ENCRYPTOR_SALT}
   indexing:
     max-file-bytes: 102400
     chunk-size: 800

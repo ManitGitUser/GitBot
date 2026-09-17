@@ -2,9 +2,13 @@ package com.example.gitbot.controller;
 
 import com.example.gitbot.dto.GitRepoResponse;
 import com.example.gitbot.dto.IndexStatusResponse;
+import com.example.gitbot.entity.GitRepo;
 import com.example.gitbot.security.CurrentUser;
 import com.example.gitbot.service.GitRepoService;
+import com.example.gitbot.service.indexing.IndexingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +21,7 @@ public class GitRepoController {
 
     private final GitRepoService gitRepoService;
     private final CurrentUser currentUser;
+    private final IndexingService indexingService;
 
     @GetMapping
     public List<GitRepoResponse> listAll(
@@ -39,5 +44,13 @@ public class GitRepoController {
     public IndexStatusResponse status(@PathVariable UUID id) {
         UUID userId = currentUser.require().getId();
         return gitRepoService.status(userId, id);
+    }
+
+    @PostMapping("/{id}/index")
+    public ResponseEntity<GitRepoResponse> index(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        GitRepo repo = indexingService.startIndexing(id, userId);
+        indexingService.indexAsync(id, userId);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(gitRepoService.toResponse(repo));
     }
 }

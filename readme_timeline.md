@@ -17,6 +17,8 @@ wanted to set up /backend/src/main/resources/db/migration folder for flyway but 
 
 configured openai in application.yaml
 
+// from now on I'll only write prefix directory as client and backend (because they are too long) 
+
 used shadcn for pre-written code for /client/components/providers/theme-provider.tsx
 used the same for /client/app/layout.tsx & /client/components/ui/mode-toggle.tsx for adding theme part
 
@@ -80,7 +82,14 @@ configured openai api key in application.yaml and other configurations related t
 
 configured for App beans at backend /config/AppConfig for rest client and ThreadExecutor for asynchronous indexing
 
-added file filters while indexing at backend /service/indexing/CodeFileFilter and /service/indexing/CodeChunker for service/indexing/IndexService
+added file filters while async code indexing pipeline at backend /service/indexing/CodeFileFilter and /service/indexing/CodeChunker for service/indexing/IndexService
 
 configured rag at backend /service/ai/RagSettings
+
+added citation in response at backend /service/ai/CodeContextRetriever with help of /service/ai/CitationMapper
+created dto at backend /dto/CitationDto and /dto/RetrievedContextDto
+
+back to client
+added client /app/chat/[repoId]/page.tsx
+added client /components/chat/chat-view.tsx and /indexing-state.tsx
 

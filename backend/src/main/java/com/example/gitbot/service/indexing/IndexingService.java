@@ -1,6 +1,5 @@
 package com.example.gitbot.service.indexing;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import com.example.gitbot.enums.IndexStatus;
 import com.example.gitbot.exception.BadRequestException;
 import com.example.gitbot.exception.NotFoundException;
 import com.example.gitbot.service.ai.RagSettings;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -42,6 +40,7 @@ public class IndexingService {
     private final CodeChunker codeChunker;
     private final GitHubRateLimiter rateLimiter;
     private final VectorStore vectorStore;
+    private final IndexingProgressService progressService;
 
     @Value("${app.indexing.max-file-bytes:102400}")
     private long maxFileBytes;
@@ -59,7 +58,6 @@ public class IndexingService {
         repo.setFilesTotal(0);
         repo.setChunkCount(0);
         repo.setErrorMessage(null);
-        repo.setUpdatedAt(Instant.now());
         return gitRepoRepository.save(repo);
     }
 
@@ -69,10 +67,10 @@ public class IndexingService {
             doIndex(repoId, userId);
         } catch (Exception ex) {
             log.error("Indexing failed for repo {}", repoId, ex);
-            markFailed(repoId, ex.getMessage());
+            deleteExistingVectors(repoId.toString());
+            progressService.markFailed(repoId, ex.getMessage());
         }
     }
-
 
     private void doIndex(UUID repoId, UUID userId) {
         GitRepo repo = gitRepoRepository.findById(repoId)
@@ -82,11 +80,10 @@ public class IndexingService {
         deleteExistingVectors(repoId.toString());
 
         Map<String, Object> tree = gitHubApiClient.getRepoTree(
-                token, repo.getOwner(), repo.getName(), repo.getDefaultBranch()
-        );
+                token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
         List<String> filePaths = listIndexableFiles(tree);
 
-        updateProgress(repoId, filePaths.size(), 0, 0, IndexStatus.INDEXING, null);
+        progressService.updateProgress(repoId, filePaths.size(), 0, 0, IndexStatus.INDEXING, null);
 
         List<Document> batch = new ArrayList<>();
         int processed = 0;
@@ -95,8 +92,7 @@ public class IndexingService {
         for (String path : filePaths) {
             try {
                 String content = gitHubApiClient.getFileContent(
-                        token, repo.getOwner(), repo.getName(), path
-                );
+                        token, repo.getOwner(), repo.getName(), path);
                 List<Document> chunks = codeChunker.chunkFile(repoId.toString(), path, content);
                 batch.addAll(chunks);
                 totalChunks += chunks.size();
@@ -110,7 +106,8 @@ public class IndexingService {
 
             processed++;
             if (processed % PROGRESS_EVERY_N_FILES == 0 || processed == filePaths.size()) {
-                updateProgress(repoId, filePaths.size(), processed, totalChunks, IndexStatus.INDEXING, null);
+                progressService.updateProgress(repoId, filePaths.size(), processed, totalChunks, IndexStatus.INDEXING,
+                        null);
             }
             rateLimiter.pause();
         }
@@ -119,9 +116,8 @@ public class IndexingService {
             vectorStore.add(batch);
         }
 
-        markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName());
+        progressService.markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName());
     }
-
 
     @SuppressWarnings("unchecked")
     private List<String> listIndexableFiles(Map<String, Object> tree) {
@@ -148,52 +144,5 @@ public class IndexingService {
         } catch (Exception ex) {
             log.warn("Could not delete existing vectors for repo {}: {}", repoId, ex.getMessage());
         }
-    };
-
-    @Transactional
-    protected void updateProgress(
-            UUID repoId,
-            int total,
-            int processed,
-            int chunks,
-            IndexStatus status,
-            String error
-    ) {
-        gitRepoRepository.findById(repoId).ifPresent(repo -> {
-            repo.setFilesTotal(total);
-            repo.setFilesProcessed(processed);
-            repo.setChunkCount(chunks);
-            repo.setIndexStatus(status);
-            repo.setErrorMessage(error);
-            repo.setUpdatedAt(Instant.now());
-            gitRepoRepository.save(repo);
-        });
-    }
-
-    @Transactional
-    protected void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName) {
-        gitRepoRepository.findById(repoId).ifPresent(repo -> {
-            repo.setIndexStatus(IndexStatus.READY);
-            repo.setFilesTotal(totalFiles);
-            repo.setFilesProcessed(processedFiles);
-            repo.setChunkCount(totalChunks);
-            repo.setIndexedAt(Instant.now());
-            repo.setErrorMessage(null);
-            repo.setUpdatedAt(Instant.now());
-            gitRepoRepository.save(repo);
-        });
-        log.info("Indexed {} files ({} chunks) for {}", processedFiles, totalChunks, fullName);
-    }
-
-    @Transactional
-    protected void markFailed(UUID repoId, String message) {
-        gitRepoRepository.findById(repoId).ifPresent(repo -> {
-            repo.setIndexStatus(IndexStatus.FAILED);
-            repo.setErrorMessage(message != null && message.length() > 2000
-                    ? message.substring(0, 2000)
-                    : message);
-            repo.setUpdatedAt(Instant.now());
-            gitRepoRepository.save(repo);
-        });
     }
 }

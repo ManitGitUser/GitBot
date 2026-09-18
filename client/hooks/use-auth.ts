@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 export const AUTH_COOKIE = "gitbot_auth";

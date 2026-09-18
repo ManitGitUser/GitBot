@@ -77,6 +77,40 @@ export function getGithubLoginUrl() {
     return `${getApiBaseUrl()}/oauth2/authorization/github`;
 }
 
+function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp(`(^|;\\s*)(${name})=([^;]*)`));
+    return match ? decodeURIComponent(match[3]) : null;
+}
+
+let cachedCsrfToken: string | null = null;
+
+export async function getCsrfToken(): Promise<string | null> {
+    const cookieToken = getCookie("XSRF-TOKEN");
+    if (cookieToken) {
+        cachedCsrfToken = cookieToken;
+        return cookieToken;
+    }
+    if (cachedCsrfToken) {
+        return cachedCsrfToken;
+    }
+    try {
+        const res = await fetch(`${getApiBaseUrl()}/api/auth/csrf`, {
+            credentials: "include",
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data?.token) {
+                cachedCsrfToken = data.token;
+                return data.token;
+            }
+        }
+    } catch {
+        // ignore fetch failure for optional token prefetch
+    }
+    return getCookie("XSRF-TOKEN");
+}
+
 async function parseError(res: Response): Promise<string> {
     try {
         const data = await res.json();
@@ -90,13 +124,23 @@ export async function apiFetch<T>(
     path: string,
     init?: RequestInit,
 ): Promise<T> {
+    const method = init?.method?.toUpperCase() || "GET";
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(init?.headers as Record<string, string> || {}),
+    };
+
+    if (["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+        const csrfToken = await getCsrfToken();
+        if (csrfToken) {
+            headers["X-XSRF-TOKEN"] = csrfToken;
+        }
+    }
+
     const res = await fetch(`${getApiBaseUrl()}${path}`, {
         ...init,
         credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-            ...(init?.headers ?? {}),
-        },
+        headers,
     });
 
     if (!res.ok) {
@@ -111,6 +155,7 @@ export async function apiFetch<T>(
 }
 
 export const api = {
+    csrf: () => apiFetch<{ token: string; headerName: string; parameterName: string }>("/api/auth/csrf"),
     me: () => apiFetch<User>("/api/auth/me"),
     logout: () =>
         apiFetch<void>("/api/auth/logout", {

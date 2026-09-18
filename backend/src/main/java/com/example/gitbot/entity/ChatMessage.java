@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.example.gitbot.enums.MessageRole;
+import com.example.gitbot.enums.MessageStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -34,6 +35,11 @@ public class ChatMessage {
     @Column(nullable = false, length = 20)
     private MessageRole role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private MessageStatus status = MessageStatus.COMPLETE;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
@@ -47,6 +53,9 @@ public class ChatMessage {
     void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (status == null) {
+            status = MessageStatus.COMPLETE;
         }
     }
 }

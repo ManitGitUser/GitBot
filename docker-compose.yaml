@@ -3,16 +3,16 @@ services:
     image: pgvector/pgvector:pg16
     container_name: gitbot-postgres
     environment:
-      POSTGRES_DB: gitbot
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 3003
+      POSTGRES_DB: ${POSTGRES_DB:-gitbot}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-3003}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - gitbot_pg_data:/var/lib/postgresql/data
       - ./docker/postgres/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d gitbot"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-gitbot}"]
       interval: 5s
       timeout: 5s
       retries: 5

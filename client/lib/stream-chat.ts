@@ -1,4 +1,4 @@
-import { getApiBaseUrl, ApiError, type ChatMessage } from "@/lib/api";
+import { getApiBaseUrl, getCsrfToken, ApiError, type ChatMessage } from "@/lib/api";
 
 export type StreamChatHandlers = {
     onUserMessage?: (message: ChatMessage) => void;
@@ -14,12 +14,18 @@ export async function streamChatMessage(
     content: string,
     handlers: StreamChatHandlers = {}
 ): Promise<void> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) {
+        headers["X-XSRF-TOKEN"] = csrfToken;
+    }
+
     const res = await fetch(
         `${getApiBaseUrl()}/api/chat/sessions/${sessionId}/messages`,
         {
             method: "POST",
             credentials: "include",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({ content }),
             signal: handlers.signal,
         }

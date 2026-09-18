@@ -95,4 +95,8 @@ public class GitRepo {
         }
     }
 
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

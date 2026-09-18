@@ -3,7 +3,9 @@ spring:
     name: GitBot
 
   config:
-    import: "optional:file:backend/.env[.properties]"
+    import:
+      - "optional:file:.env[.properties]"
+      - "optional:file:backend/.env[.properties]"
 
   datasource:
     url: ${DB_URL}
@@ -56,7 +58,8 @@ spring:
             client-id: ${GITHUB_CLIENT_ID}
             client-secret: ${GITHUB_CLIENT_SECRET}
             scope:
-              - read:user,repo
+              - read:user
+              - repo
         provider:
           github:
             user-name-attribute: id

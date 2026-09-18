@@ -39,4 +39,15 @@ public class AuthController {
         ));
     }
 
+    @GetMapping("/csrf")
+    public ResponseEntity<Map<String, String>> csrf(org.springframework.security.web.csrf.CsrfToken token) {
+        if (token == null) {
+            return ResponseEntity.ok(Map.of());
+        }
+        return ResponseEntity.ok(Map.of(
+                "token", token.getToken(),
+                "headerName", token.getHeaderName(),
+                "parameterName", token.getParameterName()
+        ));
+    }
 }

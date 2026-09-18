@@ -37,7 +37,7 @@ public class GitRepoController {
     @GetMapping("/{id}")
     public GitRepoResponse get(@PathVariable UUID id) {
         UUID userId = currentUser.require().getId();
-        return gitRepoService.toResponse(gitRepoService.requireOwned(userId, id));
+        return gitRepoService.toResponse(gitRepoService.requireOwned(id, userId));
     }
 
     @GetMapping("/{id}/status")

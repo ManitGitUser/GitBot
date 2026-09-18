@@ -100,7 +100,8 @@ public class ChatService {
                 .sessionId(session.getId())
                 .role(MessageRole.USER)
                 .content(userContent)
-                .build());
+                .build()
+        );
 
         // 3. RAG retrieval — find code chunks similar to the question
         var retrievedContext = codeContextRetriever.retrieve(repo.getId(), userContent);
@@ -115,7 +116,8 @@ public class ChatService {
                 toMessageResponse(userMessage),
                 retrievedContext.citations(),
                 systemPrompt,
-                userPrompt);
+                userPrompt
+        );
     }
 
     private ChatSessionResponse toSessionResponse(ChatSession session) {
@@ -123,7 +125,8 @@ public class ChatService {
                 session.getId(),
                 session.getRepositoryId(),
                 session.getTitle(),
-                session.getCreatedAt());
+                session.getCreatedAt()
+        );
     }
 
     private ChatMessageResponse toMessageResponse(ChatMessage message) {
@@ -132,6 +135,7 @@ public class ChatService {
                 message.getRole(),
                 message.getContent(),
                 citationMapper.fromJson(message.getCitations()),
-                message.getCreatedAt());
+                message.getCreatedAt()
+        );
     }
 }

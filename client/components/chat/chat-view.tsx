@@ -2,13 +2,25 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Copy, GitFork, Globe, Share2 } from "lucide-react";
+import {
+    AlertCircle,
+    ArrowLeft,
+    Check,
+    CheckCircle2,
+    Copy,
+    GitFork,
+    Globe,
+    Lock,
+    Share2,
+    Shield,
+} from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { IndexingState } from "@/components/chat/indexing-state";
 import { AppShell } from "@/components/layout/app-shell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -20,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import {
@@ -34,13 +47,34 @@ import {
 } from "@/hooks/use-chat";
 import { useIndexStatus, useRepository } from "@/hooks/use-repos";
 import type { ChatMessage, ReportReason } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-const REPORT_REASONS: { value: ReportReason; label: string }[] = [
-    { value: "INCORRECT", label: "Incorrect answer" },
-    { value: "IRRELEVANT", label: "Irrelevant answer" },
-    { value: "UNSAFE", label: "Harmful or unsafe answer" },
-    { value: "CITATION_ISSUE", label: "Citation problem" },
-    { value: "OTHER", label: "Other issue" },
+const REPORT_REASONS: { value: ReportReason; label: string; desc: string }[] = [
+    {
+        value: "INCORRECT",
+        label: "Incorrect or inaccurate",
+        desc: "Contains factual errors, hallucinated APIs, or incorrect code.",
+    },
+    {
+        value: "IRRELEVANT",
+        label: "Irrelevant or unhelpful",
+        desc: "Did not follow instructions or went off-topic.",
+    },
+    {
+        value: "UNSAFE",
+        label: "Harmful or unsafe",
+        desc: "Inappropriate suggestions or security vulnerabilities.",
+    },
+    {
+        value: "CITATION_ISSUE",
+        label: "Citation problem",
+        desc: "Referenced wrong file paths or non-existent line ranges.",
+    },
+    {
+        value: "OTHER",
+        label: "Other issue",
+        desc: "Any other problem not covered above.",
+    },
 ];
 
 export function ChatView({ repoId }: { repoId: string }) {
@@ -85,6 +119,8 @@ export function ChatView({ repoId }: { repoId: string }) {
     const [reportingMessage, setReportingMessage] = useState<ChatMessage | null>(null);
     const [reportReason, setReportReason] = useState<ReportReason>("INCORRECT");
     const [reportDetails, setReportDetails] = useState("");
+    const [reportSuccess, setReportSuccess] = useState(false);
+    const [reportError, setReportError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!ready || sessionsQuery.isLoading) return;
@@ -138,10 +174,13 @@ export function ChatView({ repoId }: { repoId: string }) {
         setReportingMessage(msg);
         setReportReason("INCORRECT");
         setReportDetails("");
+        setReportSuccess(false);
+        setReportError(null);
     }
 
     function handleConfirmReport() {
         if (!sessionId || !reportingMessage) return;
+        setReportError(null);
         reportMessage.mutate(
             {
                 sessionId,
@@ -150,7 +189,12 @@ export function ChatView({ repoId }: { repoId: string }) {
                 details: reportDetails.trim() || undefined,
             },
             {
-                onSuccess: () => setReportingMessage(null),
+                onSuccess: () => {
+                    setReportSuccess(true);
+                },
+                onError: (err) => {
+                    setReportError(err.message || "Failed to submit report");
+                },
             }
         );
     }
@@ -163,6 +207,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                     void sessionsQuery.refetch();
                     toast.add({
                         title: "Share link revoked",
+                        description: "This conversation is now private.",
                         type: "success",
                     });
                 },
@@ -172,8 +217,8 @@ export function ChatView({ repoId }: { repoId: string }) {
                 onSuccess: (share) => {
                     void sessionsQuery.refetch();
                     toast.add({
-                        title: "Share link created",
-                        description: `Public URL: ${share.shareUrl}`,
+                        title: "Public link created",
+                        description: `Anyone with the link can view this transcript: ${share.shareUrl}`,
                         type: "success",
                     });
                 },
@@ -236,10 +281,11 @@ export function ChatView({ repoId }: { repoId: string }) {
                             variant="outline"
                             size="sm"
                             onClick={() => setShareOpen(true)}
-                            aria-label="Share chat"
+                            aria-label="Share conversation transcript"
+                            className="gap-1.5"
                         >
-                            <Share2 data-icon="inline-start" />
-                            {activeSession?.isShared ? "Shared" : "Share"}
+                            <Share2 className="size-3.5" />
+                            <span>{activeSession?.isShared ? "Shared" : "Share"}</span>
                         </Button>
                     )}
                     <Button variant="outline" size="sm" render={<Link href="/dashboard" />}>
@@ -282,6 +328,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                                 onRetry={(msgId) => retry(msgId)}
                                 onBranch={handleStartBranch}
                                 onReport={handleStartReport}
+                                onShare={() => setShareOpen(true)}
                             />
                             <ChatComposer
                                 disabled={!sessionId}
@@ -298,18 +345,47 @@ export function ChatView({ repoId }: { repoId: string }) {
             <Dialog open={shareOpen} onOpenChange={setShareOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Globe className="size-5 text-primary" />
-                            Share conversation
-                        </DialogTitle>
+                        <div className="flex items-center justify-between pr-6">
+                            <DialogTitle className="flex items-center gap-2">
+                                <Globe className="size-5 text-primary" />
+                                Share conversation
+                            </DialogTitle>
+                            <Badge
+                                variant={activeSession?.isShared ? "secondary" : "outline"}
+                                className="text-xs"
+                            >
+                                {activeSession?.isShared ? (
+                                    <>
+                                        <Globe className="mr-1 size-3 text-emerald-500" />
+                                        Public link active
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lock className="mr-1 size-3" />
+                                        Private
+                                    </>
+                                )}
+                            </Badge>
+                        </div>
                         <DialogDescription>
-                            Create a public, read-only link to this conversation. Anyone with the link will be
-                            able to view the questions, answers, and referenced repository code snippets.
+                            Create an unguessable public link to this conversation. Anyone with the URL will be
+                            able to view questions, responses, and referenced code snippets in read-only mode.
                         </DialogDescription>
                     </DialogHeader>
 
+                    {/* Privacy notice callout */}
+                    <div className="rounded-xl border border-muted-foreground/20 bg-muted/40 p-3 text-xs text-muted-foreground flex gap-2.5 items-start">
+                        <Shield className="size-4 text-primary shrink-0 mt-0.5" />
+                        <div>
+                            <strong className="text-foreground">Privacy Protection:</strong> Sharing this transcript does
+                            <strong> not</strong> make your GitHub repository public. Only messages in this session and
+                            the specific code excerpts cited are shared.
+                        </div>
+                    </div>
+
                     {activeSession?.isShared && activeSession.shareToken ? (
-                        <div className="space-y-4 py-2">
+                        <div className="space-y-3 py-1">
+                            <label className="text-xs font-medium text-foreground">Public Link</label>
                             <div className="flex gap-2">
                                 <Input
                                     readOnly
@@ -318,20 +394,20 @@ export function ChatView({ repoId }: { repoId: string }) {
                                             ? `${window.location.origin}/share/${activeSession.shareToken}`
                                             : `/share/${activeSession.shareToken}`
                                     }
-                                    className="text-xs"
+                                    className="text-xs font-mono select-all"
                                 />
-                                <Button size="sm" onClick={handleCopyShareUrl}>
+                                <Button size="sm" onClick={handleCopyShareUrl} className="shrink-0">
                                     {copiedShare ? <Check className="size-4" /> : <Copy className="size-4" />}
                                     <span className="ml-1.5">{copiedShare ? "Copied" : "Copy"}</span>
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Sharing is currently active. You can revoke access at any time.
+                                You can revoke this link at any time to immediately disable access.
                             </p>
                         </div>
                     ) : (
-                        <div className="py-2 text-sm text-muted-foreground">
-                            Private by default. Clicking enable will create an unguessable public link.
+                        <div className="py-2 text-xs text-muted-foreground">
+                            This conversation is currently private. Click below to generate an unguessable share link.
                         </div>
                     )}
 
@@ -344,7 +420,8 @@ export function ChatView({ repoId }: { repoId: string }) {
                             disabled={shareSession.isPending || revokeShare.isPending}
                             onClick={handleToggleShare}
                         >
-                            {activeSession?.isShared ? "Revoke share" : "Enable share link"}
+                            {shareSession.isPending || revokeShare.isPending ? <Spinner /> : null}
+                            {activeSession?.isShared ? "Revoke share" : "Create public link"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -359,24 +436,33 @@ export function ChatView({ repoId }: { repoId: string }) {
                             Branch conversation
                         </DialogTitle>
                         <DialogDescription>
-                            Create a new chat conversation starting from this message. All prior turns up to
-                            this point will be copied over.
+                            Fork this chat into a new conversation. All messages up to this point will be preserved,
+                            letting you explore an alternate line of inquiry.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                        <label className="text-xs font-medium text-muted-foreground">Branch Title</label>
-                        <Input
-                            value={branchTitle}
-                            onChange={(e) => setBranchTitle(e.target.value)}
-                            maxLength={200}
-                            placeholder="Title for branched conversation"
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleConfirmBranch();
-                                }
-                            }}
-                        />
+                        {branchingMessage && (
+                            <div className="rounded-xl border bg-muted/30 p-2.5 text-xs text-muted-foreground line-clamp-3">
+                                <span className="font-medium text-foreground">Branching from: </span>
+                                {branchingMessage.content}
+                            </div>
+                        )}
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">New Branch Title</label>
+                            <Input
+                                value={branchTitle}
+                                onChange={(e) => setBranchTitle(e.target.value)}
+                                maxLength={200}
+                                autoFocus
+                                placeholder="Branch title"
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleConfirmBranch();
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setBranchingMessage(null)}>
@@ -386,6 +472,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                             disabled={!branchTitle.trim() || branchSession.isPending}
                             onClick={handleConfirmBranch}
                         >
+                            {branchSession.isPending ? <Spinner /> : null}
                             Create branch
                         </Button>
                     </DialogFooter>
@@ -398,48 +485,103 @@ export function ChatView({ repoId }: { repoId: string }) {
                     <DialogHeader>
                         <DialogTitle>Report AI response</DialogTitle>
                         <DialogDescription>
-                            Help us improve GitBot by flagging incorrect, irrelevant, or unsafe answers.
+                            Provide feedback to help improve the quality and safety of GitBot answers.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground">Reason</label>
-                            <select
-                                value={reportReason}
-                                onChange={(e) => setReportReason(e.target.value as ReportReason)}
-                                className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+
+                    {reportSuccess ? (
+                        <div className="py-6 text-center space-y-3">
+                            <CheckCircle2 className="size-10 text-emerald-500 mx-auto" />
+                            <div>
+                                <h3 className="text-sm font-semibold">Feedback Submitted</h3>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                                    Thank you! Your feedback has been recorded and will help improve future code grounding.
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setReportingMessage(null)}
+                                className="mt-2"
                             >
-                                {REPORT_REASONS.map((r) => (
-                                    <option key={r.value} value={r.value}>
-                                        {r.label}
-                                    </option>
-                                ))}
-                            </select>
+                                Done
+                            </Button>
                         </div>
-                        <div>
-                            <label className="text-xs font-medium text-muted-foreground">
-                                Details (optional)
-                            </label>
-                            <Textarea
-                                value={reportDetails}
-                                onChange={(e) => setReportDetails(e.target.value)}
-                                placeholder="What went wrong with this response?"
-                                maxLength={2000}
-                                className="mt-1 min-h-20"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setReportingMessage(null)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            disabled={reportMessage.isPending}
-                            onClick={handleConfirmReport}
-                        >
-                            Submit report
-                        </Button>
-                    </DialogFooter>
+                    ) : (
+                        <>
+                            <div className="space-y-4 py-2">
+                                {reportError && (
+                                    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive flex items-center gap-2">
+                                        <AlertCircle className="size-4 shrink-0" />
+                                        <span>{reportError}</span>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium text-foreground">Select Reason</label>
+                                    <div className="space-y-1.5">
+                                        {REPORT_REASONS.map((r) => {
+                                            const isSelected = reportReason === r.value;
+                                            return (
+                                                <div
+                                                    key={r.value}
+                                                    onClick={() => setReportReason(r.value)}
+                                                    className={cn(
+                                                        "cursor-pointer rounded-xl border p-2.5 text-xs transition-colors",
+                                                        isSelected
+                                                            ? "border-primary bg-primary/5 text-foreground"
+                                                            : "border-border hover:bg-muted/50 text-muted-foreground"
+                                                    )}
+                                                    role="radio"
+                                                    aria-checked={isSelected}
+                                                    tabIndex={0}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter" || e.key === " ") {
+                                                            e.preventDefault();
+                                                            setReportReason(r.value);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="font-medium text-foreground">{r.label}</div>
+                                                    <div className="text-[11px] opacity-80 mt-0.5">{r.desc}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <label className="font-medium text-foreground">
+                                            Additional Details (optional)
+                                        </label>
+                                        <span className="text-muted-foreground text-[11px]">
+                                            {reportDetails.length} / 2000
+                                        </span>
+                                    </div>
+                                    <Textarea
+                                        value={reportDetails}
+                                        onChange={(e) => setReportDetails(e.target.value)}
+                                        placeholder="What went wrong or what would have been a better answer?"
+                                        maxLength={2000}
+                                        className="min-h-20 text-xs"
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setReportingMessage(null)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    disabled={reportMessage.isPending}
+                                    onClick={handleConfirmReport}
+                                >
+                                    {reportMessage.isPending ? <Spinner /> : null}
+                                    Submit report
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
         </AppShell>

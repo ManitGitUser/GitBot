@@ -1,12 +1,23 @@
 "use client";
 
-import { AlertCircle, Bot, Check, Copy, Flag, GitFork, RotateCcw, UserRound } from "lucide-react";
+import {
+    AlertCircle,
+    Bot,
+    Check,
+    ChevronDown,
+    Copy,
+    Flag,
+    GitFork,
+    RotateCcw,
+    Share2,
+    StopCircle,
+    UserRound,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { CitationChips } from "@/components/chat/citation-chips";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,12 +61,14 @@ function AssistantMessageToolbar({
     onRetry,
     onBranch,
     onReport,
+    onShare,
 }: {
     message: ChatMessage;
     streaming?: boolean;
     onRetry?: (messageId: string) => void;
     onBranch?: (message: ChatMessage) => void;
     onReport?: (message: ChatMessage) => void;
+    onShare?: () => void;
 }) {
     const [copied, setCopied] = useState(false);
 
@@ -71,20 +84,27 @@ function AssistantMessageToolbar({
         } else {
             toast.add({
                 title: "Failed to copy",
-                description: "Clipboard permissions denied or unsupported.",
+                description: "Clipboard access was denied.",
                 type: "error",
             });
         }
     }
 
     return (
-        <div className="mt-2 flex flex-wrap items-center gap-1 text-muted-foreground">
+        <div
+            className={cn(
+                "mt-2 flex min-h-7 flex-wrap items-center gap-1 text-muted-foreground",
+                "opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+            )}
+            role="toolbar"
+            aria-label="Assistant message actions"
+        >
             <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 text-xs"
                 onClick={handleCopy}
-                aria-label="Copy response"
+                aria-label={copied ? "Copied to clipboard" : "Copy response to clipboard"}
             >
                 {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
                 <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
@@ -97,7 +117,8 @@ function AssistantMessageToolbar({
                     className="h-7 px-2 text-xs"
                     disabled={streaming}
                     onClick={() => onRetry(message.id)}
-                    aria-label="Retry response"
+                    aria-label="Retry generating this response"
+                    title={streaming ? "Wait for generation to finish" : undefined}
                 >
                     <RotateCcw className="size-3.5" />
                     <span className="ml-1">Retry</span>
@@ -111,10 +132,25 @@ function AssistantMessageToolbar({
                     className="h-7 px-2 text-xs"
                     disabled={streaming}
                     onClick={() => onBranch(message)}
-                    aria-label="Branch conversation from this message"
+                    aria-label="Branch new conversation from this message"
+                    title={streaming ? "Wait for generation to finish" : undefined}
                 >
                     <GitFork className="size-3.5" />
                     <span className="ml-1">Branch</span>
+                </Button>
+            )}
+
+            {onShare && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={streaming}
+                    onClick={onShare}
+                    aria-label="Share this chat conversation"
+                >
+                    <Share2 className="size-3.5" />
+                    <span className="ml-1">Share</span>
                 </Button>
             )}
 
@@ -122,10 +158,11 @@ function AssistantMessageToolbar({
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs hover:text-amber-500"
+                    className="h-7 px-2 text-xs hover:text-amber-500 dark:hover:text-amber-400"
                     disabled={streaming}
                     onClick={() => onReport(message)}
-                    aria-label="Report AI response"
+                    aria-label="Report incorrect or unsafe response"
+                    title={streaming ? "Wait for generation to finish" : undefined}
                 >
                     <Flag className="size-3.5" />
                     <span className="ml-1">Report</span>
@@ -144,6 +181,7 @@ export function ChatMessages({
     onRetry,
     onBranch,
     onReport,
+    onShare,
 }: {
     repo: Repository;
     messages: ChatMessage[];
@@ -153,12 +191,64 @@ export function ChatMessages({
     onRetry?: (messageId: string) => void;
     onBranch?: (message: ChatMessage) => void;
     onReport?: (message: ChatMessage) => void;
+    onShare?: () => void;
 }) {
-    const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [isScrolledUp, setIsScrolledUp] = useState(false);
+    const isScrolledUpRef = useRef(false);
 
+    // Attach scroll listener to scroll viewport to preserve user scroll position
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, streamText]);
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        const handleScroll = () => {
+            const distanceFromBottom =
+                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+            const scrolledUp = distanceFromBottom > 100;
+            isScrolledUpRef.current = scrolledUp;
+            setIsScrolledUp(scrolledUp);
+        };
+
+        viewport.addEventListener("scroll", handleScroll, { passive: true });
+        return () => viewport.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    // Auto-scroll when new messages or tokens arrive, ONLY IF user hasn't scrolled up
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        if (!isScrolledUpRef.current) {
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior: streaming ? "instant" : "smooth",
+            });
+        }
+    }, [messages, streamText, streaming]);
+
+    function scrollToBottom() {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        isScrolledUpRef.current = false;
+        setIsScrolledUp(false);
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+    }
 
     if (isLoading) {
         return (
@@ -171,112 +261,170 @@ export function ChatMessages({
     }
 
     return (
-        <ScrollArea className="flex-1">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
-                {messages.length === 0 && !streamText && (
-                    <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-10 text-center">
-                        <p className="font-medium">Ask anything about this codebase</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Try “Where is authentication handled?” or “Explain the repository indexing flow.”
-                        </p>
-                    </div>
-                )}
+        <div ref={scrollContainerRef} className="relative flex min-h-0 flex-1 flex-col">
+            {/* Live region for screen readers */}
+            <div aria-live="polite" aria-atomic="true" className="sr-only">
+                {streaming
+                    ? "GitBot is generating a response..."
+                    : "Response generation finished."}
+            </div>
 
-                <MessageGroup>
-                    {messages.map((message) => {
-                        const isUser = message.role === "USER";
-                        const isInterrupted = message.status === "INTERRUPTED";
-                        const isFailed = message.status === "FAILED";
+            <ScrollArea className="flex-1">
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
+                    {messages.length === 0 && !streamText && (
+                        <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-10 text-center">
+                            <p className="font-medium">Ask anything about this codebase</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Try “Where is authentication handled?” or “Explain the repository indexing flow.”
+                            </p>
+                        </div>
+                    )}
 
-                        return (
-                            <Message key={message.id} align={isUser ? "end" : "start"}>
+                    <MessageGroup>
+                        {messages.map((message) => {
+                            const isUser = message.role === "USER";
+                            const isInterrupted = message.status === "INTERRUPTED";
+                            const isFailed = message.status === "FAILED";
+
+                            return (
+                                <Message
+                                    key={message.id}
+                                    align={isUser ? "end" : "start"}
+                                    className="group/msg relative"
+                                >
+                                    <MessageAvatar>
+                                        <Avatar className="size-8">
+                                            <AvatarFallback
+                                                className={cn(
+                                                    isUser
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : "bg-muted"
+                                                )}
+                                            >
+                                                {isUser ? (
+                                                    <UserRound className="size-4" />
+                                                ) : (
+                                                    <Bot className="size-4" />
+                                                )}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    </MessageAvatar>
+                                    <MessageContent>
+                                        <Bubble
+                                            variant={isUser ? "default" : "muted"}
+                                            align={isUser ? "end" : "start"}
+                                            className={cn(!isUser && "max-w-full")}
+                                        >
+                                            <BubbleContent className={cn(!isUser && "w-full max-w-full px-4 py-3")}>
+                                                {isUser ? (
+                                                    <span className="whitespace-pre-wrap">{message.content}</span>
+                                                ) : (
+                                                    <>
+                                                        <ChatMarkdown content={message.content} />
+                                                        {isInterrupted && (
+                                                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+                                                                <div className="flex items-center gap-1.5 font-medium">
+                                                                    <StopCircle className="size-4 shrink-0 text-amber-500" />
+                                                                    <span>Generation stopped before completion.</span>
+                                                                </div>
+                                                                {onRetry && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-6 px-2 text-xs border-amber-500/40 hover:bg-amber-500/20"
+                                                                        disabled={streaming}
+                                                                        onClick={() => onRetry(message.id)}
+                                                                    >
+                                                                        <RotateCcw className="mr-1 size-3" />
+                                                                        Retry
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {isFailed && (
+                                                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
+                                                                <div className="flex items-center gap-1.5 font-medium">
+                                                                    <AlertCircle className="size-4 shrink-0" />
+                                                                    <span>Generation encountered an error.</span>
+                                                                </div>
+                                                                {onRetry && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="destructive"
+                                                                        className="h-6 px-2 text-xs"
+                                                                        disabled={streaming}
+                                                                        onClick={() => onRetry(message.id)}
+                                                                    >
+                                                                        <RotateCcw className="mr-1 size-3" />
+                                                                        Retry
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </BubbleContent>
+                                        </Bubble>
+
+                                        {!isUser && message.citations?.length > 0 && (
+                                            <MessageFooter>
+                                                <CitationChips repo={repo} citations={message.citations} />
+                                            </MessageFooter>
+                                        )}
+
+                                        {!isUser && (
+                                            <AssistantMessageToolbar
+                                                message={message}
+                                                streaming={streaming}
+                                                onRetry={onRetry}
+                                                onBranch={onBranch}
+                                                onReport={onReport}
+                                                onShare={onShare}
+                                            />
+                                        )}
+                                    </MessageContent>
+                                </Message>
+                            );
+                        })}
+
+                        {streamText && (
+                            <Message align="start">
                                 <MessageAvatar>
                                     <Avatar className="size-8">
-                                        <AvatarFallback
-                                            className={cn(
-                                                isUser
-                                                    ? "bg-primary text-primary-foreground"
-                                                    : "bg-muted"
-                                            )}
-                                        >
-                                            {isUser ? (
-                                                <UserRound className="size-4" />
-                                            ) : (
-                                                <Bot className="size-4" />
-                                            )}
+                                        <AvatarFallback className="bg-muted">
+                                            <Bot className="size-4" />
                                         </AvatarFallback>
                                     </Avatar>
                                 </MessageAvatar>
                                 <MessageContent>
-                                    <Bubble
-                                        variant={isUser ? "default" : "muted"}
-                                        align={isUser ? "end" : "start"}
-                                        className={cn(!isUser && "max-w-full")}
-                                    >
-                                        <BubbleContent className={cn(!isUser && "w-full max-w-full px-4 py-3")}>
-                                            {isUser ? (
-                                                <span className="whitespace-pre-wrap">{message.content}</span>
-                                            ) : (
-                                                <>
-                                                    <ChatMarkdown content={message.content} />
-                                                    {(isInterrupted || isFailed) && (
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <Badge
-                                                                variant={isFailed ? "destructive" : "outline"}
-                                                                className="text-xs"
-                                                            >
-                                                                <AlertCircle className="mr-1 size-3" />
-                                                                {isFailed ? "Generation Failed" : "Interrupted"}
-                                                            </Badge>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
+                                    <Bubble variant="muted" align="start" className="max-w-full">
+                                        <BubbleContent className="w-full max-w-full px-4 py-3">
+                                            <ChatMarkdown content={streamText} isStreaming />
+                                            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
                                         </BubbleContent>
                                     </Bubble>
-
-                                    {!isUser && message.citations?.length > 0 && (
-                                        <MessageFooter>
-                                            <CitationChips repo={repo} citations={message.citations} />
-                                        </MessageFooter>
-                                    )}
-
-                                    {!isUser && (
-                                        <AssistantMessageToolbar
-                                            message={message}
-                                            streaming={streaming}
-                                            onRetry={onRetry}
-                                            onBranch={onBranch}
-                                            onReport={onReport}
-                                        />
-                                    )}
                                 </MessageContent>
                             </Message>
-                        );
-                    })}
+                        )}
+                    </MessageGroup>
+                </div>
+            </ScrollArea>
 
-                    {streamText && (
-                        <Message align="start">
-                            <MessageAvatar>
-                                <Avatar className="size-8">
-                                    <AvatarFallback className="bg-muted">
-                                        <Bot className="size-4" />
-                                    </AvatarFallback>
-                                </Avatar>
-                            </MessageAvatar>
-                            <MessageContent>
-                                <Bubble variant="muted" align="start" className="max-w-full">
-                                    <BubbleContent className="w-full max-w-full px-4 py-3">
-                                        <ChatMarkdown content={streamText} isStreaming />
-                                        <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
-                                    </BubbleContent>
-                                </Bubble>
-                            </MessageContent>
-                        </Message>
-                    )}
-                </MessageGroup>
-                <div ref={bottomRef} />
-            </div>
-        </ScrollArea>
+            {/* Jump to bottom button if user scrolled up */}
+            {isScrolledUp && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        className="pointer-events-auto gap-1.5 rounded-full border bg-background/90 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-transform hover:scale-105 active:scale-95"
+                        onClick={scrollToBottom}
+                        aria-label="Scroll to newest messages"
+                    >
+                        <ChevronDown className="size-3.5" />
+                        <span>Jump to bottom</span>
+                    </Button>
+                </div>
+            )}
+        </div>
     );
 }

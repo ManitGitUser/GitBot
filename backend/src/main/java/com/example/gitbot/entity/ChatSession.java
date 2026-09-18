@@ -36,6 +36,22 @@ public class ChatSession {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "parent_session_id")
+    private UUID parentSessionId;
+
+    @Column(name = "branch_message_id")
+    private UUID branchMessageId;
+
+    @Column(name = "share_token", length = 64, unique = true)
+    private String shareToken;
+
+    @Column(name = "is_shared", nullable = false)
+    @Builder.Default
+    private boolean isShared = false;
+
+    @Column(name = "shared_at")
+    private Instant sharedAt;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

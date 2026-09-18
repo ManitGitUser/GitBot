@@ -9,9 +9,13 @@ export type StreamChatHandlers = {
     signal?: AbortSignal;
 };
 
+export type StreamChatPayload =
+    | { content: string; retryMessageId?: never }
+    | { retryMessageId: string; content?: never };
+
 export async function streamChatMessage(
     sessionId: string,
-    content: string,
+    payload: string | StreamChatPayload,
     handlers: StreamChatHandlers = {}
 ): Promise<void> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -20,16 +24,22 @@ export async function streamChatMessage(
         headers["X-XSRF-TOKEN"] = csrfToken;
     }
 
-    const res = await fetch(
-        `${getApiBaseUrl()}/api/chat/sessions/${sessionId}/messages`,
-        {
-            method: "POST",
-            credentials: "include",
-            headers,
-            body: JSON.stringify({ content }),
-            signal: handlers.signal,
-        }
-    );
+    const isRetry = typeof payload === "object" && Boolean(payload.retryMessageId);
+    const url = isRetry
+        ? `${getApiBaseUrl()}/api/chat/sessions/${sessionId}/retry`
+        : `${getApiBaseUrl()}/api/chat/sessions/${sessionId}/messages`;
+
+    const body = isRetry
+        ? JSON.stringify({ messageId: (payload as { retryMessageId: string }).retryMessageId })
+        : JSON.stringify({ content: typeof payload === "string" ? payload : payload.content });
+
+    const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body,
+        signal: handlers.signal,
+    });
 
     if (!res.ok) {
         let message = res.statusText;
@@ -85,6 +95,8 @@ export async function streamChatMessage(
                     handlers.onAssistantMessage?.(JSON.parse(data) as ChatMessage);
                 } else if (event === "done") {
                     handlers.onDone?.();
+                } else if (event === "error") {
+                    handlers.onError?.(new Error(data));
                 }
             } catch (err) {
                 handlers.onError?.(

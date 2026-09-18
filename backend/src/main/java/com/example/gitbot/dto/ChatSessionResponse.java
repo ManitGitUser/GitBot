@@ -7,5 +7,9 @@ public record ChatSessionResponse(
         UUID id,
         UUID repositoryId,
         String title,
-        Instant createdAt) {
+        Instant createdAt,
+        UUID parentSessionId,
+        UUID branchMessageId,
+        boolean isShared,
+        String shareToken) {
 }

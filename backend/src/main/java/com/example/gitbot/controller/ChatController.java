@@ -1,12 +1,27 @@
 package com.example.gitbot.controller;
 
-
 import java.util.List;
 import java.util.UUID;
 
+import com.example.gitbot.dto.BranchChatSessionRequest;
+import com.example.gitbot.dto.ChatMessageRequest;
+import com.example.gitbot.dto.ChatMessageResponse;
+import com.example.gitbot.dto.ChatSessionResponse;
+import com.example.gitbot.dto.CreateChatSessionRequest;
+import com.example.gitbot.dto.RenameChatSessionRequest;
+import com.example.gitbot.dto.ReportMessageRequest;
+import com.example.gitbot.dto.RetryMessageRequest;
+import com.example.gitbot.dto.ShareResponse;
+import com.example.gitbot.security.CurrentUser;
+import com.example.gitbot.service.ChatService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,15 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import com.example.gitbot.dto.ChatMessageRequest;
-import com.example.gitbot.dto.ChatMessageResponse;
-import com.example.gitbot.dto.ChatSessionResponse;
-import com.example.gitbot.dto.CreateChatSessionRequest;
-import com.example.gitbot.security.CurrentUser;
-import com.example.gitbot.service.ChatService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -51,11 +57,72 @@ public class ChatController {
         return chatService.getMessages(userId, id);
     }
 
+    @DeleteMapping("/sessions/{id}")
+    public ResponseEntity<Void> deleteSession(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        chatService.deleteSession(userId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/sessions/{id}")
+    public ResponseEntity<ChatSessionResponse> renameSession(
+            @PathVariable UUID id,
+            @Valid @RequestBody RenameChatSessionRequest request) {
+        UUID userId = currentUser.require().getId();
+        return ResponseEntity.ok(chatService.renameSession(userId, id, request.title()));
+    }
+
+    @PostMapping("/sessions/{id}/branch")
+    public ResponseEntity<ChatSessionResponse> branchSession(
+            @PathVariable UUID id,
+            @Valid @RequestBody BranchChatSessionRequest request) {
+        UUID userId = currentUser.require().getId();
+        return ResponseEntity.ok(chatService.branchSession(userId, id, request.messageId(), request.title()));
+    }
+
     @PostMapping(value = "/sessions/{id}/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sendMessage(
             @PathVariable UUID id,
             @Valid @RequestBody ChatMessageRequest request) {
         UUID userId = currentUser.require().getId();
         return chatService.streamReply(userId, id, request.content());
+    }
+
+    @PostMapping(value = "/sessions/{id}/retry", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter retryMessage(
+            @PathVariable UUID id,
+            @Valid @RequestBody RetryMessageRequest request) {
+        UUID userId = currentUser.require().getId();
+        return chatService.streamRetry(userId, id, request.messageId());
+    }
+
+    @PostMapping("/sessions/{id}/stop")
+    public ResponseEntity<Void> stopStream(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        chatService.stopStream(userId, id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/sessions/{id}/share")
+    public ResponseEntity<ShareResponse> createShare(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        return ResponseEntity.ok(chatService.createShare(userId, id));
+    }
+
+    @DeleteMapping("/sessions/{id}/share")
+    public ResponseEntity<Void> revokeShare(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        chatService.revokeShare(userId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/sessions/{id}/messages/{messageId}/report")
+    public ResponseEntity<Void> reportMessage(
+            @PathVariable UUID id,
+            @PathVariable UUID messageId,
+            @Valid @RequestBody ReportMessageRequest request) {
+        UUID userId = currentUser.require().getId();
+        chatService.reportMessage(userId, id, messageId, request.reason(), request.details());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }

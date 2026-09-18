@@ -37,11 +37,24 @@ export type IndexStatusResponse = {
     errorMessage: string | null;
 };
 
+export type MessageStatus = "COMPLETE" | "INTERRUPTED" | "FAILED";
+
+export type ReportReason =
+    | "INCORRECT"
+    | "IRRELEVANT"
+    | "UNSAFE"
+    | "CITATION_ISSUE"
+    | "OTHER";
+
 export type ChatSession = {
     id: string;
     repositoryId: string;
     title: string;
     createdAt: string;
+    parentSessionId?: string | null;
+    branchMessageId?: string | null;
+    isShared?: boolean;
+    shareToken?: string | null;
 };
 
 export type Citation = {
@@ -54,9 +67,22 @@ export type Citation = {
 export type ChatMessage = {
     id: string;
     role: "USER" | "ASSISTANT";
+    status?: MessageStatus;
     content: string;
     citations: Citation[];
     createdAt: string;
+};
+
+export type ShareResponse = {
+    shareToken: string;
+    shareUrl: string;
+};
+
+export type PublicSharedChat = {
+    title: string;
+    repoFullName: string;
+    sharedAt: string;
+    messages: ChatMessage[];
 };
 
 
@@ -180,4 +206,35 @@ export const api = {
         ),
     getMessages: (sessionId: string) =>
         apiFetch<ChatMessage[]>(`/api/chat/sessions/${sessionId}`),
+    deleteSession: (sessionId: string) =>
+        apiFetch<void>(`/api/chat/sessions/${sessionId}`, { method: "DELETE" }),
+    renameSession: (sessionId: string, title: string) =>
+        apiFetch<ChatSession>(`/api/chat/sessions/${sessionId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ title }),
+        }),
+    branchSession: (sessionId: string, messageId: string, title?: string) =>
+        apiFetch<ChatSession>(`/api/chat/sessions/${sessionId}/branch`, {
+            method: "POST",
+            body: JSON.stringify({ messageId, title }),
+        }),
+    createShare: (sessionId: string) =>
+        apiFetch<ShareResponse>(`/api/chat/sessions/${sessionId}/share`, {
+            method: "POST",
+        }),
+    revokeShare: (sessionId: string) =>
+        apiFetch<void>(`/api/chat/sessions/${sessionId}/share`, {
+            method: "DELETE",
+        }),
+    reportMessage: (sessionId: string, messageId: string, reason: ReportReason, details?: string) =>
+        apiFetch<void>(`/api/chat/sessions/${sessionId}/messages/${messageId}/report`, {
+            method: "POST",
+            body: JSON.stringify({ reason, details }),
+        }),
+    stopStream: (sessionId: string) =>
+        apiFetch<void>(`/api/chat/sessions/${sessionId}/stop`, {
+            method: "POST",
+        }),
+    getPublicShare: (shareToken: string) =>
+        apiFetch<PublicSharedChat>(`/api/public/shares/${shareToken}`),
 };

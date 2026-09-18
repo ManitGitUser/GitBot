@@ -97,8 +97,7 @@ public class GitRepoService {
                 gitRepo.getChunkCount(),
                 gitRepo.getFilesTotal(),
                 gitRepo.getFilesProcessed(),
-                gitRepo.getErrorMessage()
-        );
+                gitRepo.getErrorMessage());
     }
 
     @Transactional(readOnly = true)
@@ -117,8 +116,13 @@ public class GitRepoService {
                 repo.getFilesProcessed(),
                 repo.getChunkCount(),
                 repo.getIndexedAt(),
-                repo.getErrorMessage()
-        );
+                repo.getErrorMessage());
+    }
+
+    @Transactional(readOnly = true)
+    public GitRepo getById(UUID repoId) {
+        return gitRepoRepository.findById(repoId)
+                .orElseThrow(() -> new NotFoundException("Repository not found"));
     }
 
     @Transactional(readOnly = true)

@@ -71,6 +71,14 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
+    public com.example.gitbot.dto.PageResponse<ChatSessionResponse> listSessions(UUID userId, UUID repositoryId, org.springframework.data.domain.Pageable pageable) {
+        gitRepoService.requireOwned(repositoryId, userId);
+        org.springframework.data.domain.Page<ChatSession> page = chatSessionRepository
+                .findByUserIdAndRepositoryIdOrderByCreatedAtDesc(userId, repositoryId, pageable);
+        return com.example.gitbot.dto.PageResponse.of(page.map(this::toSessionResponse));
+    }
+
+    @Transactional(readOnly = true)
     public List<ChatSessionResponse> listSessions(UUID userId, UUID repositoryId) {
         gitRepoService.requireOwned(repositoryId, userId);
         return chatSessionRepository
@@ -78,6 +86,64 @@ public class ChatService {
                 .stream()
                 .map(this::toSessionResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.gitbot.dto.PagedMessagesResponse getMessages(UUID userId, UUID sessionId, String before, int limit) {
+        ChatSession session = requireSession(userId, sessionId);
+        int validLimit = limit > 0 ? limit : 10;
+        int queryLimit = validLimit + 1;
+
+        List<ChatMessage> descMessages;
+        if (before != null && !before.isBlank()) {
+            String[] parts = before.split("_", 2);
+            if (parts.length == 2) {
+                try {
+                    Instant beforeCreatedAt = Instant.parse(parts[0]);
+                    UUID beforeId = UUID.fromString(parts[1]);
+                    descMessages = chatMessageRepository.findMessagesBefore(
+                            session.getId(),
+                            beforeCreatedAt,
+                            beforeId,
+                            org.springframework.data.domain.PageRequest.of(0, queryLimit)
+                    );
+                } catch (Exception ex) {
+                    descMessages = chatMessageRepository.findLatestMessages(
+                            session.getId(),
+                            org.springframework.data.domain.PageRequest.of(0, queryLimit)
+                    );
+                }
+            } else {
+                descMessages = chatMessageRepository.findLatestMessages(
+                        session.getId(),
+                        org.springframework.data.domain.PageRequest.of(0, queryLimit)
+                );
+            }
+        } else {
+            descMessages = chatMessageRepository.findLatestMessages(
+                    session.getId(),
+                    org.springframework.data.domain.PageRequest.of(0, queryLimit)
+            );
+        }
+
+        boolean hasMore = descMessages.size() > validLimit;
+        List<ChatMessage> pageMessages = hasMore
+                ? descMessages.subList(0, validLimit)
+                : descMessages;
+
+        String nextCursor = null;
+        if (hasMore && !pageMessages.isEmpty()) {
+            ChatMessage oldest = pageMessages.get(pageMessages.size() - 1);
+            nextCursor = oldest.getCreatedAt().toString() + "_" + oldest.getId().toString();
+        }
+
+        // Reverse to ASC (chronological order) for display
+        List<ChatMessageResponse> chronological = new ArrayList<>(pageMessages.size());
+        for (int i = pageMessages.size() - 1; i >= 0; i--) {
+            chronological.add(toMessageResponse(pageMessages.get(i)));
+        }
+
+        return new com.example.gitbot.dto.PagedMessagesResponse(chronological, hasMore, nextCursor);
     }
 
     @Transactional(readOnly = true)
@@ -104,8 +170,15 @@ public class ChatService {
         // Cancel any existing active stream and persist interrupted state before reading history
         chatStreamHandler.stopStream(sessionId);
 
-        // 1. Fetch prior conversation history before persisting the current question
-        List<ChatMessage> priorMessages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+        // 1. Fetch prior conversation history (latest 10 messages) before persisting the current question
+        List<ChatMessage> recentDesc = chatMessageRepository.findLatestMessages(
+                session.getId(),
+                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES)
+        );
+        List<ChatMessage> priorMessages = new ArrayList<>(recentDesc.size());
+        for (int i = recentDesc.size() - 1; i >= 0; i--) {
+            priorMessages.add(recentDesc.get(i));
+        }
 
         // 2. Persist the user's message
         ChatMessage userMessage = chatMessageRepository.save(ChatMessage.builder()
@@ -144,44 +217,50 @@ public class ChatService {
         // Cancel any existing active stream and persist interrupted state before reading messages
         chatStreamHandler.stopStream(sessionId);
 
-        List<ChatMessage> allMessages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+        ChatMessage targetMsg = chatMessageRepository.findByIdAndSessionId(messageId, session.getId())
+                .orElseThrow(() -> new NotFoundException("Message not found in this session"));
 
-        int targetIdx = -1;
-        for (int i = 0; i < allMessages.size(); i++) {
-            if (allMessages.get(i).getId().equals(messageId)) {
-                targetIdx = i;
-                break;
-            }
-        }
-
-        if (targetIdx == -1) {
-            throw new NotFoundException("Message not found in this session");
-        }
-
-        ChatMessage targetMsg = allMessages.get(targetIdx);
         ChatMessage userMsg;
         ChatMessage assistantMsg = null;
 
         if (targetMsg.getRole() == MessageRole.ASSISTANT) {
             assistantMsg = targetMsg;
-            if (targetIdx == 0 || allMessages.get(targetIdx - 1).getRole() != MessageRole.USER) {
+            List<ChatMessage> beforeAssistant = chatMessageRepository.findMessagesBefore(
+                    session.getId(),
+                    targetMsg.getCreatedAt(),
+                    targetMsg.getId(),
+                    org.springframework.data.domain.PageRequest.of(0, 1)
+            );
+            if (beforeAssistant.isEmpty() || beforeAssistant.get(0).getRole() != MessageRole.USER) {
                 throw new BadRequestException("Cannot find corresponding user message to retry");
             }
-            userMsg = allMessages.get(targetIdx - 1);
+            userMsg = beforeAssistant.get(0);
         } else {
             userMsg = targetMsg;
-            if (targetIdx + 1 < allMessages.size()
-                    && allMessages.get(targetIdx + 1).getRole() == MessageRole.ASSISTANT) {
-                assistantMsg = allMessages.get(targetIdx + 1);
+            List<ChatMessage> allAfter = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+            int uIdx = -1;
+            for (int i = 0; i < allAfter.size(); i++) {
+                if (allAfter.get(i).getId().equals(userMsg.getId())) {
+                    uIdx = i;
+                    break;
+                }
+            }
+            if (uIdx != -1 && uIdx + 1 < allAfter.size()
+                    && allAfter.get(uIdx + 1).getRole() == MessageRole.ASSISTANT) {
+                assistantMsg = allAfter.get(uIdx + 1);
             }
         }
 
-        // History turns strictly before this user question
-        List<ChatMessage> historyMessages = new ArrayList<>();
-        for (ChatMessage m : allMessages) {
-            if (m.getCreatedAt().isBefore(userMsg.getCreatedAt())) {
-                historyMessages.add(m);
-            }
+        // History turns strictly before this user question (latest 10)
+        List<ChatMessage> historyDesc = chatMessageRepository.findMessagesBefore(
+                session.getId(),
+                userMsg.getCreatedAt(),
+                userMsg.getId(),
+                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES)
+        );
+        List<ChatMessage> historyMessages = new ArrayList<>(historyDesc.size());
+        for (int i = historyDesc.size() - 1; i >= 0; i--) {
+            historyMessages.add(historyDesc.get(i));
         }
 
         var retrievedContext = codeContextRetriever.retrieve(repo.getId(), userMsg.getContent());

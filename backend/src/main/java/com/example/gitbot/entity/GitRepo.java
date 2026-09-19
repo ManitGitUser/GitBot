@@ -11,9 +11,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "git_repositories", uniqueConstraints = @UniqueConstraint(
-        columnNames = {"user_id", "github_repo_id"}
-))
+@Table(
+        name = "git_repositories",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "github_repo_id"}),
+        indexes = @Index(name = "idx_git_repos_user_fullname", columnList = "user_id, full_name")
+)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

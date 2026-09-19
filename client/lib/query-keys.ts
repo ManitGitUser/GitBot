@@ -5,14 +5,14 @@ export const queryKeys = {
     },
     repos: {
         all: ["repos"] as const,
-        list: () => [...queryKeys.repos.all, "list"] as const,
+        list: (page = 0, size = 10) => [...queryKeys.repos.all, "list", { page, size }] as const,
         detail: (id: string) => [...queryKeys.repos.all, "detail", id] as const,
         status: (id: string) => [...queryKeys.repos.all, "status", id] as const,
     },
     chat: {
         all: ["chat"] as const,
-        sessions: (repositoryId: string) =>
-            [...queryKeys.chat.all, "sessions", repositoryId] as const,
+        sessions: (repositoryId: string, page = 0, size = 10) =>
+            [...queryKeys.chat.all, "sessions", repositoryId, { page, size }] as const,
         messages: (sessionId: string) =>
             [...queryKeys.chat.all, "messages", sessionId] as const,
     },

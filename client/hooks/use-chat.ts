@@ -1,31 +1,76 @@
 "use client";
 
 import {
+    useInfiniteQuery,
     useMutation,
     useQuery,
     useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 
-import { api, type ChatMessage, type ReportReason } from "@/lib/api";
+import { api, type ChatMessage, type PagedMessagesResponse, type ReportReason } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { streamChatMessage } from "@/lib/stream-chat";
 import { toast } from "@/components/ui/toast";
 
 export function useChatSessions(repositoryId: string, enabled = true) {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: queryKeys.chat.sessions(repositoryId),
-        queryFn: () => api.listSessions(repositoryId),
+        queryFn: ({ pageParam = 0 }) => api.listSessions(repositoryId, pageParam, 10),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => (lastPage.hasNext ? lastPage.page + 1 : undefined),
         enabled: Boolean(repositoryId) && enabled,
     });
 }
 
 export function useChatMessages(sessionId: string | null) {
-    return useQuery({
+    const queryClient = useQueryClient();
+    const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
+
+    const query = useQuery({
         queryKey: queryKeys.chat.messages(sessionId ?? ""),
-        queryFn: () => api.getMessages(sessionId!),
+        queryFn: () => api.getMessages(sessionId!, null, 10),
         enabled: Boolean(sessionId),
+        staleTime: 60_000,
     });
+
+    const loadEarlier = useCallback(async () => {
+        if (!sessionId || !query.data?.hasMore || !query.data.nextCursor || isLoadingEarlier) {
+            return;
+        }
+        setIsLoadingEarlier(true);
+        try {
+            const older = await api.getMessages(sessionId, query.data.nextCursor, 10);
+            queryClient.setQueryData<PagedMessagesResponse>(
+                queryKeys.chat.messages(sessionId),
+                (prev) => {
+                    if (!prev) return older;
+                    return {
+                        messages: [...older.messages, ...prev.messages],
+                        hasMore: older.hasMore,
+                        nextCursor: older.nextCursor,
+                    };
+                }
+            );
+        } catch (error) {
+            toast.add({
+                title: "Could not load earlier messages",
+                description: error instanceof Error ? error.message : "Unknown error",
+                type: "error",
+            });
+        } finally {
+            setIsLoadingEarlier(false);
+        }
+    }, [sessionId, query.data, isLoadingEarlier, queryClient]);
+
+    return {
+        ...query,
+        messages: query.data?.messages ?? [],
+        hasMore: query.data?.hasMore ?? false,
+        nextCursor: query.data?.nextCursor ?? null,
+        loadEarlier,
+        isLoadingEarlier,
+    };
 }
 
 export function useCreateChatSession(repositoryId: string) {
@@ -37,7 +82,11 @@ export function useCreateChatSession(repositoryId: string) {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.sessions(repositoryId),
             });
-            queryClient.setQueryData(queryKeys.chat.messages(session.id), []);
+            queryClient.setQueryData<PagedMessagesResponse>(queryKeys.chat.messages(session.id), {
+                messages: [],
+                hasMore: false,
+                nextCursor: null,
+            });
         },
         onError: (error: Error) => {
             toast.add({
@@ -215,9 +264,15 @@ export function useStreamChat(sessionId: string | null) {
                 createdAt: new Date().toISOString(),
             };
 
-            queryClient.setQueryData<ChatMessage[]>(
+            queryClient.setQueryData<PagedMessagesResponse>(
                 queryKeys.chat.messages(sessionId),
-                (prev) => [...(prev ?? []), optimistic]
+                (prev) => {
+                    const base = prev ?? { messages: [], hasMore: false, nextCursor: null };
+                    return {
+                        ...base,
+                        messages: [...base.messages, optimistic],
+                    };
+                }
             );
 
             setStreaming(true);
@@ -228,27 +283,35 @@ export function useStreamChat(sessionId: string | null) {
                 await streamChatMessage(sessionId, { content: content.trim() }, {
                     signal: controller.signal,
                     onUserMessage: (message) => {
-                        queryClient.setQueryData<ChatMessage[]>(
+                        queryClient.setQueryData<PagedMessagesResponse>(
                             queryKeys.chat.messages(sessionId),
-                            (prev) => [
-                                ...(prev ?? []).filter((m) => m.id !== optimisticId),
-                                message,
-                            ]
+                            (prev) => {
+                                const base = prev ?? { messages: [], hasMore: false, nextCursor: null };
+                                return {
+                                    ...base,
+                                    messages: [
+                                        ...base.messages.filter((m) => m.id !== optimisticId),
+                                        message,
+                                    ],
+                                };
+                            }
                         );
                     },
                     onToken: (token) => {
                         setStreamText((prev) => prev + token);
                     },
                     onAssistantMessage: (message) => {
-                        queryClient.setQueryData<ChatMessage[]>(
+                        queryClient.setQueryData<PagedMessagesResponse>(
                             queryKeys.chat.messages(sessionId),
                             (prev) => {
-                                const current = prev ?? [];
-                                const exists = current.some((m) => m.id === message.id);
-                                if (exists) {
-                                    return current.map((m) => (m.id === message.id ? message : m));
-                                }
-                                return [...current, message];
+                                const base = prev ?? { messages: [], hasMore: false, nextCursor: null };
+                                const exists = base.messages.some((m) => m.id === message.id);
+                                return {
+                                    ...base,
+                                    messages: exists
+                                        ? base.messages.map((m) => (m.id === message.id ? message : m))
+                                        : [...base.messages, message],
+                                };
                             }
                         );
                         setStreamText("");
@@ -301,15 +364,17 @@ export function useStreamChat(sessionId: string | null) {
                         setStreamText((prev) => prev + token);
                     },
                     onAssistantMessage: (message) => {
-                        queryClient.setQueryData<ChatMessage[]>(
+                        queryClient.setQueryData<PagedMessagesResponse>(
                             queryKeys.chat.messages(sessionId),
                             (prev) => {
-                                const current = prev ?? [];
-                                const exists = current.some((m) => m.id === message.id);
-                                if (exists) {
-                                    return current.map((m) => (m.id === message.id ? message : m));
-                                }
-                                return [...current, message];
+                                const base = prev ?? { messages: [], hasMore: false, nextCursor: null };
+                                const exists = base.messages.some((m) => m.id === message.id);
+                                return {
+                                    ...base,
+                                    messages: exists
+                                        ? base.messages.map((m) => (m.id === message.id ? message : m))
+                                        : [...base.messages, message],
+                                };
                             }
                         );
                         setStreamText("");

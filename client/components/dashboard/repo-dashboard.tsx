@@ -20,7 +20,8 @@ import type { IndexStatus } from "@/lib/api";
 type FilterStatus = "ALL" | IndexStatus;
 
 export function RepoDashboard() {
-    const reposQuery = useRepos();
+    const [page, setPage] = useState(0);
+    const reposQuery = useRepos(page, 10);
     const syncAllMutation = useSyncAllRepos();
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<FilterStatus>("ALL");
@@ -28,8 +29,10 @@ export function RepoDashboard() {
         "all"
     );
 
+    const pageData = reposQuery.data;
+
     const filtered = useMemo(() => {
-        const list = reposQuery.data ?? [];
+        const list = pageData?.content ?? [];
         const q = search.trim().toLowerCase();
 
         return list.filter((repo) => {
@@ -43,10 +46,10 @@ export function RepoDashboard() {
                 (repo.language ?? "").toLowerCase().includes(q)
             );
         });
-    }, [reposQuery.data, search, status, visibility]);
+    }, [pageData?.content, search, status, visibility]);
 
     const readyCount =
-        reposQuery.data?.filter((r) => r.indexStatus === "READY").length ?? 0;
+        pageData?.content?.filter((r) => r.indexStatus === "READY").length ?? 0;
 
     return (
         <div className="flex min-h-full flex-col">
@@ -57,7 +60,7 @@ export function RepoDashboard() {
                 onVisibilityChange={setVisibility}
                 status={status}
                 onStatusChange={setStatus}
-                totalCount={reposQuery.data?.length}
+                totalCount={pageData?.totalElements}
                 readyCount={readyCount}
                 onSyncAll={() => syncAllMutation.mutate()}
                 isSyncingAll={syncAllMutation.isPending}
@@ -106,6 +109,35 @@ export function RepoDashboard() {
                         {filtered.map((repo) => (
                             <RepoCard key={repo.id} repo={repo} />
                         ))}
+                    </div>
+                )}
+
+                {reposQuery.isSuccess && pageData && pageData.totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/40 pt-4 mt-2">
+                        <p className="text-sm text-muted-foreground">
+                            Showing <span className="font-medium text-foreground">{page * 10 + 1}</span>–<span className="font-medium text-foreground">{Math.min((page + 1) * 10, pageData.totalElements)}</span> of <span className="font-medium text-foreground">{pageData.totalElements}</span> repositories
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                                disabled={!pageData.hasPrevious}
+                            >
+                                Previous
+                            </Button>
+                            <span className="text-sm text-muted-foreground px-2">
+                                Page {pageData.page + 1} of {pageData.totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage((p) => p + 1)}
+                                disabled={!pageData.hasNext}
+                            >
+                                Next
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>

@@ -56,15 +56,20 @@ public class GitHubApiClient {
     }
 
     public String getLatestCommitSha(String accessToken, String owner, String repo, String branch) {
-        Map<String, Object> body = client(accessToken)
-                .get()
-                .uri("/repos/{owner}/{repo}/commits/{ref}", owner, repo, branch)
-                .retrieve()
-                .body(MAP);
-        if (body == null || body.get("sha") == null) {
-            throw new IllegalStateException("Failed to retrieve latest commit SHA for " + owner + "/" + repo);
+        try {
+            Map<String, Object> body = client(accessToken)
+                    .get()
+                    .uri("/repos/{owner}/{repo}/commits/{ref}", owner, repo, branch)
+                    .retrieve()
+                    .body(MAP);
+            if (body == null || body.get("sha") == null) {
+                return null;
+            }
+            return String.valueOf(body.get("sha"));
+        } catch (org.springframework.web.client.HttpClientErrorException.Conflict
+                | org.springframework.web.client.HttpClientErrorException.NotFound ex) {
+            return null;
         }
-        return String.valueOf(body.get("sha"));
     }
 
     public Map<String, Object> getRepoTree(String accessToken, String owner, String repo, String branch) {
@@ -117,6 +122,7 @@ public class GitHubApiClient {
 
     private RestClient client(String accessToken) {
         return restClientBuilder
+                .clone()
                 .baseUrl(API_BASE)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")

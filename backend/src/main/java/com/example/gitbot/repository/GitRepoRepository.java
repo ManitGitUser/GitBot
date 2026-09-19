@@ -1,16 +1,19 @@
 package com.example.gitbot.repository;
 
 import com.example.gitbot.entity.GitRepo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
 
-
 public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
 
     List<GitRepo> findByUserIdOrderByFullNameAsc(UUID userId);
+
+    Page<GitRepo> findByUserIdOrderByFullNameAsc(UUID userId, Pageable pageable);
 
     List<GitRepo> findByUserId(UUID userId);
 

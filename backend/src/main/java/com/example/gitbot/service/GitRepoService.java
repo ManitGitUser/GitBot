@@ -118,15 +118,21 @@ public class GitRepoService {
         User user = userService.getById(userId);
         String token = userService.decryptAccessToken(user);
 
-        String currentSha = gitHubApiClient.getLatestCommitSha(
-                token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
+        String currentSha = null;
+        try {
+            currentSha = gitHubApiClient.getLatestCommitSha(
+                    token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
+        } catch (Exception ex) {
+            log.warn("Could not fetch latest commit SHA for repository {}: {}", repo.getFullName(), ex.getMessage());
+        }
 
         repo.setLatestCommitSha(currentSha);
+        repo.setUpdatedAt(Instant.now());
         gitRepoRepository.save(repo);
 
         String indexedSha = repo.getIndexedCommitSha();
 
-        if (indexedSha != null && indexedSha.equals(currentSha) && repo.getIndexStatus() == IndexStatus.READY) {
+        if (currentSha != null && currentSha.equals(indexedSha)) {
             return new SyncRepoResponse(
                     repo.getId(),
                     false,
@@ -136,13 +142,20 @@ public class GitRepoService {
             );
         }
 
-        indexingService.startIndexing(repoId, userId);
-        indexingService.indexAsync(repoId, userId);
+        if (currentSha == null) {
+            return new SyncRepoResponse(
+                    repo.getId(),
+                    false,
+                    "Repository is empty or has no commits.",
+                    null,
+                    indexedSha
+            );
+        }
 
         return new SyncRepoResponse(
                 repo.getId(),
-                true,
-                "New commit detected. Update index started.",
+                false,
+                "New commit available. Click Index to update.",
                 currentSha,
                 indexedSha
         );
@@ -311,5 +324,11 @@ public class GitRepoService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.gitbot.dto.PageResponse<GitRepoResponse> listStored(UUID userId, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.domain.Page<GitRepo> page = gitRepoRepository.findByUserIdOrderByFullNameAsc(userId, pageable);
+        return com.example.gitbot.dto.PageResponse.of(page.map(this::toResponse));
     }
 }

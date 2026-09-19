@@ -32,7 +32,8 @@ export function RepoCard({ repo }: { repo: Repository }) {
         repo.indexedCommitSha &&
         repo.latestCommitSha !== repo.indexedCommitSha
     );
-    const isIndexing = repo.indexStatus === "INDEXING" || indexMutation.isPending || syncMutation.isPending;
+    const isSyncing = syncMutation.isPending;
+    const isIndexing = repo.indexStatus === "INDEXING" || indexMutation.isPending;
     const isFailed = repo.indexStatus === "FAILED";
     const progress = getRepoProgress(repo);
 
@@ -164,16 +165,16 @@ export function RepoCard({ repo }: { repo: Repository }) {
                         <Button
                             variant="outline"
                             size="sm"
-                            disabled={isIndexing}
+                            disabled={isIndexing || isSyncing}
                             onClick={() => syncMutation.mutate(repo.id)}
                             title="Sync repository with latest GitHub commits"
                         >
-                            {syncMutation.isPending ? (
+                            {isSyncing ? (
                                 <Spinner data-icon="inline-start" />
                             ) : (
                                 <RefreshCw data-icon="inline-start" />
                             )}
-                            {syncMutation.isPending ? "Syncing…" : "Sync"}
+                            {isSyncing ? "Syncing…" : "Sync"}
                         </Button>
                     )}
                     {repo.indexStatus === "READY" && (
@@ -186,9 +187,9 @@ export function RepoCard({ repo }: { repo: Repository }) {
                         <Button
                             size="sm"
                             variant="default"
-                            disabled={isIndexing}
+                            disabled={isIndexing || isSyncing}
                             onClick={() => indexMutation.mutate(repo.id)}
-                            title="Index the new commit from GitHub"
+                            title="Reindex the new commit from GitHub"
                         >
                             {isIndexing ? (
                                 <>
@@ -198,7 +199,7 @@ export function RepoCard({ repo }: { repo: Repository }) {
                             ) : (
                                 <>
                                     <Sparkles data-icon="inline-start" />
-                                    Index
+                                    Reindex
                                 </>
                             )}
                         </Button>
@@ -207,7 +208,7 @@ export function RepoCard({ repo }: { repo: Repository }) {
                             size="sm"
                             variant={isFailed ? "outline" : "default"}
                             className={cn(isFailed && "border-destructive/30 text-destructive hover:bg-destructive/10")}
-                            disabled={isIndexing}
+                            disabled={isIndexing || isSyncing}
                             onClick={handlePrimary}
                         >
                             {isIndexing ? (

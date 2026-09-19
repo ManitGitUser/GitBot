@@ -320,7 +320,11 @@ class ChatServiceTest {
 
         when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
         when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
-        when(chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).thenReturn(List.of(priorUser, priorAssistant, targetUser, targetAssistant));
+        when(chatMessageRepository.findByIdAndSessionId(targetAssistant.getId(), sessionId)).thenReturn(Optional.of(targetAssistant));
+        when(chatMessageRepository.findMessagesBefore(eq(sessionId), eq(targetAssistant.getCreatedAt()), eq(targetAssistant.getId()), eq(org.springframework.data.domain.PageRequest.of(0, 1))))
+                .thenReturn(List.of(targetUser));
+        when(chatMessageRepository.findMessagesBefore(eq(sessionId), eq(targetUser.getCreatedAt()), eq(targetUser.getId()), eq(org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES))))
+                .thenReturn(List.of(priorAssistant, priorUser));
         when(codeContextRetriever.retrieve(repoId, "Target Q")).thenReturn(new RetrievedContextDto(List.of(), "code snippet"));
         when(chatPromptBuilder.buildMessages(eq(repo.getFullName()), any(), eq("code snippet"), eq("Target Q"))).thenReturn(List.of());
         when(chatStreamHandler.stream(eq(sessionId), any(), any(), any(), eq(targetAssistant.getId()))).thenReturn(new SseEmitter());

@@ -26,14 +26,16 @@ public class GitRepoController {
     private final IndexingService indexingService;
 
     @GetMapping
-    public List<GitRepoResponse> listAll(
-            @RequestParam(name = "refresh", defaultValue = "true") boolean refresh
+    public com.example.gitbot.dto.PageResponse<GitRepoResponse> listAll(
+            @RequestParam(name = "refresh", defaultValue = "false") boolean refresh,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size
     ) {
         UUID userId = currentUser.require().getId();
         if (refresh) {
-            return gitRepoService.syncAndListGitRepos(userId);
+            gitRepoService.syncAndListGitRepos(userId);
         }
-        return gitRepoService.listStored(userId);
+        return gitRepoService.listStored(userId, org.springframework.data.domain.PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")

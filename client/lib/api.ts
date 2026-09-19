@@ -104,6 +104,24 @@ export type PublicSharedChat = {
     messages: ChatMessage[];
 };
 
+export type PageResponse<T> = {
+    content: T[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+    hasNext: boolean;
+    hasPrevious: boolean;
+};
+
+export type PagedMessagesResponse = {
+    messages: ChatMessage[];
+    hasMore: boolean;
+    nextCursor: string | null;
+};
+
 
 export class ApiError extends Error {
     status: number;
@@ -222,8 +240,8 @@ export const api = {
             method: "POST",
         }),
 
-    listRepos: (refresh = true) =>
-        apiFetch<Repository[]>(`/api/repos?refresh=${refresh}`),
+    listRepos: (page = 0, size = 10, refresh = true) =>
+        apiFetch<PageResponse<Repository>>(`/api/repos?page=${page}&size=${size}&refresh=${refresh}`),
     getRepo: (id: string) => apiFetch<Repository>(`/api/repos/${id}`),
     syncAllRepos: () =>
         apiFetch<SyncAllReposResponse>("/api/repos/sync-all", { method: "POST" }),
@@ -238,12 +256,16 @@ export const api = {
             method: "POST",
             body: JSON.stringify({ repositoryId, title }),
         }),
-    listSessions: (repositoryId: string) =>
-        apiFetch<ChatSession[]>(
-            `/api/chat/sessions?repositoryId=${encodeURIComponent(repositoryId)}`
+    listSessions: (repositoryId: string, page = 0, size = 10) =>
+        apiFetch<PageResponse<ChatSession>>(
+            `/api/chat/sessions?repositoryId=${encodeURIComponent(repositoryId)}&page=${page}&size=${size}`
         ),
-    getMessages: (sessionId: string) =>
-        apiFetch<ChatMessage[]>(`/api/chat/sessions/${sessionId}`),
+    getMessages: (sessionId: string, before?: string | null, limit = 10) => {
+        const params = new URLSearchParams();
+        if (before) params.append("before", before);
+        params.append("limit", limit.toString());
+        return apiFetch<PagedMessagesResponse>(`/api/chat/sessions/${sessionId}?${params.toString()}`);
+    },
     deleteSession: (sessionId: string) =>
         apiFetch<void>(`/api/chat/sessions/${sessionId}`, { method: "DELETE" }),
     renameSession: (sessionId: string, title: string) =>

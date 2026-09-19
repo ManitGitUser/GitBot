@@ -110,8 +110,8 @@ class SyncRepoTest {
     }
 
     @Test
-    @DisplayName("Test 2 — Stale: indexed SHA != GitHub SHA → indexing triggered")
-    void test2_stale_indexingTriggered() {
+    @DisplayName("Test 2 — Stale: indexed SHA != GitHub SHA → latestCommitSha updated, no indexing triggered")
+    void test2_stale_latestCommitShaUpdated_noIndexing() {
         when(gitRepoRepository.findByIdAndUserId(repoId, userId)).thenReturn(Optional.of(repo));
         when(userService.getById(userId)).thenReturn(user);
         when(userService.decryptAccessToken(user)).thenReturn("raw_token");
@@ -120,18 +120,20 @@ class SyncRepoTest {
 
         SyncRepoResponse response = gitRepoService.syncRepo(repoId, userId);
 
-        assertThat(response.reindexTriggered()).isTrue();
-        assertThat(response.message()).contains("New commit detected");
+        assertThat(response.reindexTriggered()).isFalse();
+        assertThat(response.message()).contains("New commit available");
         assertThat(response.currentCommitSha()).isEqualTo("sha-bbb");
         assertThat(response.indexedCommitSha()).isEqualTo("sha-aaa");
+        assertThat(repo.getLatestCommitSha()).isEqualTo("sha-bbb");
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("sha-aaa");
 
-        verify(indexingService).startIndexing(repoId, userId);
-        verify(indexingService).indexAsync(repoId, userId);
+        verify(indexingService, never()).startIndexing(any(), any());
+        verify(indexingService, never()).indexAsync(any(), any());
     }
 
     @Test
-    @DisplayName("Test 3 — Never indexed: indexedCommitSha == null → initial indexing required")
-    void test3_neverIndexed_initialIndexingRequired() {
+    @DisplayName("Test 3 — Never indexed: indexedCommitSha == null → latestCommitSha updated, no indexing triggered")
+    void test3_neverIndexed_latestCommitShaUpdated_noIndexing() {
         repo.setIndexedCommitSha(null);
         repo.setIndexStatus(IndexStatus.PENDING);
 
@@ -143,12 +145,35 @@ class SyncRepoTest {
 
         SyncRepoResponse response = gitRepoService.syncRepo(repoId, userId);
 
-        assertThat(response.reindexTriggered()).isTrue();
+        assertThat(response.reindexTriggered()).isFalse();
         assertThat(response.indexedCommitSha()).isNull();
         assertThat(response.currentCommitSha()).isEqualTo("sha-first");
+        assertThat(repo.getLatestCommitSha()).isEqualTo("sha-first");
+        assertThat(repo.getIndexedCommitSha()).isNull();
 
-        verify(indexingService).startIndexing(repoId, userId);
-        verify(indexingService).indexAsync(repoId, userId);
+        verify(indexingService, never()).startIndexing(any(), any());
+        verify(indexingService, never()).indexAsync(any(), any());
+    }
+
+    @Test
+    @DisplayName("Test 3b — Empty repository: getLatestCommitSha returns null → handled gracefully without indexing")
+    void test3b_emptyRepository_handledGracefully() {
+        when(gitRepoRepository.findByIdAndUserId(repoId, userId)).thenReturn(Optional.of(repo));
+        when(userService.getById(userId)).thenReturn(user);
+        when(userService.decryptAccessToken(user)).thenReturn("raw_token");
+        when(gitHubApiClient.getLatestCommitSha("raw_token", "octocat", "Hello-World", "main"))
+                .thenReturn(null);
+
+        SyncRepoResponse response = gitRepoService.syncRepo(repoId, userId);
+
+        assertThat(response.reindexTriggered()).isFalse();
+        assertThat(response.message()).contains("empty or has no commits");
+        assertThat(response.currentCommitSha()).isNull();
+        assertThat(response.indexedCommitSha()).isEqualTo("sha-aaa");
+        assertThat(repo.getLatestCommitSha()).isNull();
+
+        verify(indexingService, never()).startIndexing(any(), any());
+        verify(indexingService, never()).indexAsync(any(), any());
     }
 
     @Test

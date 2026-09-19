@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type Repository } from "@/lib/api";
+import { api, type PageResponse, type Repository } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/components/ui/toast";
 
@@ -17,25 +17,31 @@ function updateRepoInListCache(
     queryClient: ReturnType<typeof useQueryClient>,
     repo: Repository
 ) {
-    queryClient.setQueryData<Repository[]>(queryKeys.repos.list(), (current) => {
-        if (!current) return current;
-        return current.map((item) => (item.id === repo.id ? repo : item));
-    });
+    queryClient.setQueriesData<PageResponse<Repository>>(
+        { queryKey: [...queryKeys.repos.all, "list"] },
+        (current) => {
+            if (!current) return current;
+            return {
+                ...current,
+                content: current.content.map((item) => (item.id === repo.id ? repo : item)),
+            };
+        }
+    );
 }
 
-export function useRepos() {
+export function useRepos(page = 0, size = 10) {
     return useQuery({
-        queryKey: queryKeys.repos.list(),
+        queryKey: queryKeys.repos.list(page, size),
         queryFn: async () => {
-            const repos = await api.listRepos(false);
-            if (repos.length === 0) {
-                return api.listRepos(true);
+            const res = await api.listRepos(page, size, false);
+            if (res.totalElements === 0 && page === 0) {
+                return api.listRepos(page, size, true);
             }
-            return repos;
+            return res;
         },
         staleTime: 30_000,
         refetchInterval: (query) =>
-            hasIndexingRepos(query.state.data) ? INDEXING_POLL_MS : false,
+            hasIndexingRepos(query.state.data?.content) ? INDEXING_POLL_MS : false,
     });
 }
 
@@ -96,11 +102,16 @@ export function useSyncRepo() {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.repos.all,
             });
-            if (data.reindexTriggered) {
+            const hasNewCommit = Boolean(
+                data.currentCommitSha &&
+                data.indexedCommitSha &&
+                data.currentCommitSha !== data.indexedCommitSha
+            );
+            if (hasNewCommit) {
                 toast.add({
-                    title: "Syncing repository",
-                    description: data.message || "New commit detected. Re-indexing…",
-                    type: "loading",
+                    title: "New commit available",
+                    description: data.message || "A newer commit was detected. Click Reindex to update.",
+                    type: "success",
                 });
             } else {
                 toast.add({

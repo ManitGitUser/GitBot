@@ -223,6 +223,9 @@ export function ChatMessages({
     streamText,
     retryingMessageId,
     isLoading,
+    hasMore,
+    onLoadEarlier,
+    isLoadingEarlier,
     streaming,
     onRetry,
     onBranch,
@@ -234,6 +237,9 @@ export function ChatMessages({
     streamText?: string;
     retryingMessageId?: string | null;
     isLoading?: boolean;
+    hasMore?: boolean;
+    onLoadEarlier?: () => void;
+    isLoadingEarlier?: boolean;
     streaming?: boolean;
     onRetry?: (messageId: string) => void;
     onBranch?: (message: ChatMessage) => void;
@@ -267,7 +273,28 @@ export function ChatMessages({
         return () => viewport.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // Auto-scroll when new messages or tokens arrive, ONLY IF user hasn't scrolled up
+    const handleLoadEarlier = async () => {
+        if (!onLoadEarlier || isLoadingEarlier) return;
+        const container = scrollContainerRef.current;
+        const viewport = container?.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+
+        const prevScrollHeight = viewport?.scrollHeight ?? 0;
+        const prevScrollTop = viewport?.scrollTop ?? 0;
+
+        await onLoadEarlier();
+
+        requestAnimationFrame(() => {
+            if (viewport) {
+                const newScrollHeight = viewport.scrollHeight;
+                const delta = newScrollHeight - prevScrollHeight;
+                viewport.scrollTop = prevScrollTop + delta;
+            }
+        });
+    };
+
+    // Auto-scroll when new messages or tokens arrive, ONLY IF user hasn't scrolled up and not loading earlier
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
@@ -277,13 +304,13 @@ export function ChatMessages({
         ) as HTMLElement | null;
         if (!viewport) return;
 
-        if (!isScrolledUpRef.current) {
+        if (!isScrolledUpRef.current && !isLoadingEarlier) {
             viewport.scrollTo({
                 top: viewport.scrollHeight,
                 behavior: streaming ? "instant" : "smooth",
             });
         }
-    }, [messages, streamText, streaming]);
+    }, [messages, streamText, streaming, isLoadingEarlier]);
 
     function scrollToBottom() {
         const container = scrollContainerRef.current;
@@ -319,6 +346,20 @@ export function ChatMessages({
 
             <ScrollArea className="flex-1">
                 <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
+                    {hasMore && (
+                        <div className="flex justify-center pb-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs text-muted-foreground hover:text-foreground"
+                                onClick={handleLoadEarlier}
+                                disabled={isLoadingEarlier}
+                            >
+                                {isLoadingEarlier ? "Loading earlier messages..." : "Load earlier messages"}
+                            </Button>
+                        </div>
+                    )}
+
                     {messages.length === 0 && !streamText && (
                         <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-10 text-center">
                             <p className="font-medium">Ask anything about this codebase</p>

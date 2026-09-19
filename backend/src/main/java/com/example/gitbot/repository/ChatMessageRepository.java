@@ -1,7 +1,10 @@
 package com.example.gitbot.repository;
 
 import com.example.gitbot.entity.ChatMessage;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
@@ -14,6 +17,29 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     Optional<ChatMessage> findByIdAndSessionId(UUID id, UUID sessionId);
 
     List<ChatMessage> findBySessionIdAndCreatedAtLessThanEqualOrderByCreatedAtAsc(UUID sessionId, Instant createdAt);
+
+    @Query("""
+        SELECT m FROM ChatMessage m
+        WHERE m.sessionId = :sessionId
+        ORDER BY m.createdAt DESC, m.id DESC
+    """)
+    List<ChatMessage> findLatestMessages(
+            @Param("sessionId") UUID sessionId,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT m FROM ChatMessage m
+        WHERE m.sessionId = :sessionId
+          AND (m.createdAt < :beforeCreatedAt OR (m.createdAt = :beforeCreatedAt AND m.id < :beforeId))
+        ORDER BY m.createdAt DESC, m.id DESC
+    """)
+    List<ChatMessage> findMessagesBefore(
+            @Param("sessionId") UUID sessionId,
+            @Param("beforeCreatedAt") Instant beforeCreatedAt,
+            @Param("beforeId") UUID beforeId,
+            Pageable pageable
+    );
 
     void deleteBySessionId(UUID sessionId);
 }

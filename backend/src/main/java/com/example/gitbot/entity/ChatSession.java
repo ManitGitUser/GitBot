@@ -8,12 +8,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.*;
 
 @Entity
-@Table(name = "chat_sessions")
+@Table(
+        name = "chat_sessions",
+        indexes = @Index(name = "idx_chat_sessions_user_repo_created", columnList = "user_id, repository_id, created_at DESC")
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

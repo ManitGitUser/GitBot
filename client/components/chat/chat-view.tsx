@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertCircle,
     ArrowLeft,
@@ -46,7 +46,7 @@ import {
     useStreamChat,
 } from "@/hooks/use-chat";
 import { useIndexStatus, useRepository } from "@/hooks/use-repos";
-import type { ChatMessage, ReportReason } from "@/lib/api";
+import type { ChatMessage, ChatSession, ReportReason } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const REPORT_REASONS: { value: ReportReason; label: string; desc: string }[] = [
@@ -98,9 +98,13 @@ export function ChatView({ repoId }: { repoId: string }) {
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const autoCreateRef = useRef(false);
 
+    const allSessions = useMemo(
+        () => sessionsQuery.data?.pages.flatMap((p) => p.content) ?? [],
+        [sessionsQuery.data]
+    );
     const activeSession =
-        sessionsQuery.data?.find((s) => s.id === (selectedSessionId ?? sessionsQuery.data?.[0]?.id)) ??
-        sessionsQuery.data?.[0] ??
+        allSessions.find((s: ChatSession) => s.id === (selectedSessionId ?? allSessions[0]?.id)) ??
+        allSessions[0] ??
         null;
     const sessionId = activeSession?.id ?? null;
 
@@ -204,10 +208,10 @@ export function ChatView({ repoId }: { repoId: string }) {
 
     useEffect(() => {
         if (!ready || sessionsQuery.isLoading) return;
-        if (sessionsQuery.data && sessionsQuery.data.length > 0) return;
+        if (allSessions.length > 0) return;
         if (
             !sessionsQuery.isSuccess ||
-            (sessionsQuery.data?.length ?? 0) > 0 ||
+            allSessions.length > 0 ||
             autoCreateRef.current
         ) {
             return;
@@ -224,7 +228,7 @@ export function ChatView({ repoId }: { repoId: string }) {
         ready,
         sessionsQuery.isLoading,
         sessionsQuery.isSuccess,
-        sessionsQuery.data,
+        allSessions.length,
         createSession,
     ]);
 
@@ -430,10 +434,13 @@ export function ChatView({ repoId }: { repoId: string }) {
                         <>
                             <ChatMessages
                                 repo={repo}
-                                messages={messagesQuery.data ?? []}
+                                messages={messagesQuery.messages}
                                 streamText={streamText}
                                 retryingMessageId={retryingMessageId}
                                 isLoading={messagesQuery.isLoading}
+                                hasMore={messagesQuery.hasMore}
+                                onLoadEarlier={messagesQuery.loadEarlier}
+                                isLoadingEarlier={messagesQuery.isLoadingEarlier}
                                 streaming={streaming}
                                 onRetry={(msgId) => retry(msgId)}
                                 onBranch={handleStartBranch}

@@ -55,8 +55,8 @@ function StatCard({
 }
 
 export function OverviewDashboard() {
-    const reposQuery = useRepos();
-    const repos = reposQuery.data ?? [];
+    const reposQuery = useRepos(0, 10);
+    const repos = reposQuery.data?.content ?? [];
 
     const readyCount = repos.filter((repo) => repo.indexStatus === "READY").length;
     const indexingCount = repos.filter(
@@ -83,7 +83,7 @@ export function OverviewDashboard() {
                     <>
                         <StatCard
                             label="Repositories"
-                            value={repos.length}
+                            value={reposQuery.data?.totalElements ?? repos.length}
                             hint="Connected from GitHub"
                             icon={FolderGit2}
                         />

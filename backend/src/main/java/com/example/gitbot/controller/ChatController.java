@@ -46,15 +46,23 @@ public class ChatController {
     }
 
     @GetMapping("/sessions")
-    public List<ChatSessionResponse> listSessions(@RequestParam UUID repositoryId) {
+    public com.example.gitbot.dto.PageResponse<ChatSessionResponse> listSessions(
+            @RequestParam UUID repositoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         UUID userId = currentUser.require().getId();
-        return chatService.listSessions(userId, repositoryId);
+        return chatService.listSessions(userId, repositoryId, org.springframework.data.domain.PageRequest.of(page, size));
     }
 
     @GetMapping("/sessions/{id}")
-    public List<ChatMessageResponse> getMessages(@PathVariable UUID id) {
+    public com.example.gitbot.dto.PagedMessagesResponse getMessages(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String before,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
         UUID userId = currentUser.require().getId();
-        return chatService.getMessages(userId, id);
+        return chatService.getMessages(userId, id, before, limit);
     }
 
     @DeleteMapping("/sessions/{id}")

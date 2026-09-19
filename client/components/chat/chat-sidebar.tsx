@@ -81,7 +81,10 @@ export function ChatSidebar({
     const [renameTitle, setRenameTitle] = useState("");
     const [deletingSession, setDeletingSession] = useState<ChatSession | null>(null);
 
-    const allSessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
+    const allSessions = useMemo(
+        () => sessionsQuery.data?.pages.flatMap((p) => p.content) ?? [],
+        [sessionsQuery.data]
+    );
     const showSearch = allSessions.length > 5;
 
     const filteredSessions = useMemo(() => {
@@ -315,6 +318,21 @@ export function ChatSidebar({
                                 onClick={() => setSearchQuery("")}
                             >
                                 Clear search
+                            </Button>
+                        </div>
+                    )}
+                    {sessionsQuery.hasNextPage && (
+                        <div className="pt-2 px-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => void sessionsQuery.fetchNextPage()}
+                                disabled={sessionsQuery.isFetchingNextPage}
+                            >
+                                {sessionsQuery.isFetchingNextPage
+                                    ? "Loading..."
+                                    : "Load more conversations"}
                             </Button>
                         </div>
                     )}

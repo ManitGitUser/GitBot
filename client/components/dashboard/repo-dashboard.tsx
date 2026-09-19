@@ -1,6 +1,4 @@
-"use client";
-
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { FolderGit2 } from "lucide-react";
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -24,13 +22,15 @@ const VIEW_MODE_STORAGE_KEY = "gitbot_repo_view_mode";
 
 export function RepoDashboard() {
     const [page, setPage] = useState(0);
-    const reposQuery = useRepos(page, 10);
-    const syncAllMutation = useSyncAllRepos();
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<FilterStatus>("ALL");
     const [visibility, setVisibility] = useState<"all" | "public" | "private">(
         "all"
     );
+
+    const reposQuery = useRepos(page, 10, status, visibility, search);
+    const syncAllMutation = useSyncAllRepos();
+
     const [viewMode, setViewMode] = useState<"list" | "grid">(() => {
         if (typeof window === "undefined") return "list";
         try {
@@ -53,37 +53,38 @@ export function RepoDashboard() {
         }
     };
 
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        setPage(0);
+    };
+
+    const handleVisibilityChange = (value: "all" | "public" | "private") => {
+        setVisibility(value);
+        setPage(0);
+    };
+
+    const handleStatusChange = (value: FilterStatus) => {
+        setStatus(value);
+        setPage(0);
+    };
+
     const pageData = reposQuery.data;
-
-    const filtered = useMemo(() => {
-        const list = pageData?.content ?? [];
-        const q = search.trim().toLowerCase();
-
-        return list.filter((repo) => {
-            if (status !== "ALL" && repo.indexStatus !== status) return false;
-            if (visibility === "private" && !repo.isPrivate) return false;
-            if (visibility === "public" && repo.isPrivate) return false;
-            if (!q) return true;
-            return (
-                repo.fullName.toLowerCase().includes(q) ||
-                (repo.description ?? "").toLowerCase().includes(q) ||
-                (repo.language ?? "").toLowerCase().includes(q)
-            );
-        });
-    }, [pageData?.content, search, status, visibility]);
+    const repos = pageData?.content ?? [];
 
     const readyCount =
-        pageData?.content?.filter((r) => r.indexStatus === "READY").length ?? 0;
+        status === "READY"
+            ? (pageData?.totalElements ?? 0)
+            : (pageData?.content?.filter((r) => r.indexStatus === "READY").length ?? 0);
 
     return (
         <div className="flex min-h-full flex-col">
             <DashboardHeader
                 search={search}
-                onSearchChange={setSearch}
+                onSearchChange={handleSearchChange}
                 visibility={visibility}
-                onVisibilityChange={setVisibility}
+                onVisibilityChange={handleVisibilityChange}
                 status={status}
-                onStatusChange={setStatus}
+                onStatusChange={handleStatusChange}
                 totalCount={pageData?.totalElements}
                 readyCount={readyCount}
                 onSyncAll={() => syncAllMutation.mutate()}
@@ -128,7 +129,7 @@ export function RepoDashboard() {
                     </Empty>
                 )}
 
-                {reposQuery.isSuccess && filtered.length === 0 && (
+                {reposQuery.isSuccess && repos.length === 0 && (
                     <Empty className="border border-dashed">
                         <EmptyHeader>
                             <EmptyMedia variant="icon">
@@ -142,23 +143,23 @@ export function RepoDashboard() {
                     </Empty>
                 )}
 
-                {reposQuery.isSuccess && filtered.length > 0 && (
+                {reposQuery.isSuccess && repos.length > 0 && (
                     viewMode === "list" ? (
                         <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs">
-                            {filtered.map((repo) => (
+                            {repos.map((repo) => (
                                 <RepoListItem key={repo.id} repo={repo} />
                             ))}
                         </div>
                     ) : (
                         <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-                            {filtered.map((repo) => (
+                            {repos.map((repo) => (
                                 <RepoCard key={repo.id} repo={repo} />
                             ))}
                         </div>
                     )
                 )}
 
-                {reposQuery.isSuccess && pageData && pageData.totalPages > 1 && (
+                {reposQuery.isSuccess && pageData && pageData.totalElements > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/40 pt-4 mt-2">
                         <p className="text-sm text-muted-foreground">
                             Showing <span className="font-medium text-foreground">{page * 10 + 1}</span>–<span className="font-medium text-foreground">{Math.min((page + 1) * 10, pageData.totalElements)}</span> of <span className="font-medium text-foreground">{pageData.totalElements}</span> repositories
@@ -173,7 +174,7 @@ export function RepoDashboard() {
                                 Previous
                             </Button>
                             <span className="text-sm text-muted-foreground px-2">
-                                Page {pageData.page + 1} of {pageData.totalPages}
+                                Page {pageData.page + 1} of {Math.max(1, pageData.totalPages)}
                             </span>
                             <Button
                                 variant="outline"

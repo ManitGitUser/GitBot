@@ -29,13 +29,25 @@ function updateRepoInListCache(
     );
 }
 
-export function useRepos(page = 0, size = 10) {
+export function useRepos(
+    page = 0,
+    size = 10,
+    status = "ALL",
+    visibility = "all",
+    search = ""
+) {
     return useQuery({
-        queryKey: queryKeys.repos.list(page, size),
+        queryKey: queryKeys.repos.list(page, size, status, visibility, search),
         queryFn: async () => {
-            const res = await api.listRepos(page, size, false);
-            if (res.totalElements === 0 && page === 0) {
-                return api.listRepos(page, size, true);
+            const res = await api.listRepos(page, size, false, status, visibility, search);
+            if (
+                res.totalElements === 0 &&
+                page === 0 &&
+                status === "ALL" &&
+                visibility === "all" &&
+                !search
+            ) {
+                return api.listRepos(page, size, true, status, visibility, search);
             }
             return res;
         },

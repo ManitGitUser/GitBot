@@ -328,7 +328,37 @@ public class GitRepoService {
 
     @Transactional(readOnly = true)
     public com.example.gitbot.dto.PageResponse<GitRepoResponse> listStored(UUID userId, org.springframework.data.domain.Pageable pageable) {
-        org.springframework.data.domain.Page<GitRepo> page = gitRepoRepository.findByUserIdOrderByFullNameAsc(userId, pageable);
+        return listStored(userId, null, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.gitbot.dto.PageResponse<GitRepoResponse> listStored(
+            UUID userId,
+            String status,
+            String visibility,
+            String search,
+            org.springframework.data.domain.Pageable pageable
+    ) {
+        Boolean isPrivate = null;
+        if ("private".equalsIgnoreCase(visibility)) {
+            isPrivate = true;
+        } else if ("public".equalsIgnoreCase(visibility)) {
+            isPrivate = false;
+        }
+
+        IndexStatus indexStatus = null;
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            try {
+                indexStatus = IndexStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        String query = (search != null && !search.isBlank()) ? search.trim() : null;
+
+        org.springframework.data.domain.Page<GitRepo> page = gitRepoRepository.findWithFilters(
+                userId, isPrivate, indexStatus, query, pageable
+        );
         return com.example.gitbot.dto.PageResponse.of(page.map(this::toResponse));
     }
 }

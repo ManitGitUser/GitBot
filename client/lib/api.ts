@@ -254,8 +254,24 @@ export const api = {
             method: "POST",
         }),
 
-    listRepos: (page = 0, size = 10, refresh = true) =>
-        apiFetch<PageResponse<Repository>>(`/api/repos?page=${page}&size=${size}&refresh=${refresh}`),
+    listRepos: (
+        page = 0,
+        size = 10,
+        refresh = false,
+        status?: string,
+        visibility?: string,
+        search?: string
+    ) => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            size: size.toString(),
+            refresh: refresh.toString(),
+        });
+        if (status && status !== "ALL") params.set("status", status);
+        if (visibility && visibility !== "all") params.set("visibility", visibility);
+        if (search && search.trim()) params.set("search", search.trim());
+        return apiFetch<PageResponse<Repository>>(`/api/repos?${params.toString()}`);
+    },
     getRepo: (id: string) => apiFetch<Repository>(`/api/repos/${id}`),
     syncAllRepos: () =>
         apiFetch<SyncAllReposResponse>("/api/repos/sync-all", { method: "POST" }),

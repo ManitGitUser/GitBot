@@ -14,6 +14,19 @@ import {
     Share2,
     Sparkles,
 } from "lucide-react";
+import {
+    PieChart,
+    Pie,
+    Cell,
+    Label,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    ResponsiveContainer,
+    Tooltip,
+    LabelList,
+} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -122,6 +135,19 @@ export function OverviewDashboard() {
         .filter((r) => r.indexStatus === "READY")
         .reduce((sum, r) => sum + (r.chunkCount || 0), 0);
 
+    // Donut chart data for indexing status
+    const indexingChartData = useMemo(() => {
+        if (totalRepos === 0) {
+            return [{ name: "No Repositories", value: 1, color: "var(--muted)", percentage: 0 }];
+        }
+        return [
+            { name: "Ready", value: readyCount, color: "#10b981", percentage: readyPercentage },
+            { name: "Indexing", value: indexingCount, color: "#0ea5e9", percentage: indexingPercentage },
+            { name: "Pending", value: pendingCount, color: "#f59e0b", percentage: pendingPercentage },
+            { name: "Failed", value: failedCount, color: "#f43f5e", percentage: failedPercentage },
+        ].filter((item) => item.value > 0);
+    }, [totalRepos, readyCount, indexingCount, pendingCount, failedCount, readyPercentage, indexingPercentage, pendingPercentage, failedPercentage]);
+
     // Language breakdown
     const languageDistribution = useMemo(() => {
         if (!repos.length) return [];
@@ -135,30 +161,12 @@ export function OverviewDashboard() {
                 name,
                 count,
                 percentage: Math.round((count / repos.length) * 100),
-                color: LANGUAGE_COLORS[name] || "#8b949e",
+                color: LANGUAGE_COLORS[name] || "#64748b",
             }))
             .sort((a, b) => b.count - a.count);
     }, [repos]);
 
     const recentSessions = useMemo(() => recentSessionsQuery.data ?? [], [recentSessionsQuery.data]);
-
-    // Recent conversations grouped by repository (representing latest 10 sessions)
-    const recentConversationsByRepo = useMemo(() => {
-        if (!recentSessions.length) return [];
-        const map = new Map<string, { repoName: string; count: number; repoId: string }>();
-        for (const session of recentSessions) {
-            const repo = repos.find((r) => r.id === session.repositoryId);
-            const name = repo?.fullName || repo?.name || "Repository";
-            const current = map.get(session.repositoryId) || {
-                repoName: name,
-                count: 0,
-                repoId: session.repositoryId,
-            };
-            current.count += 1;
-            map.set(session.repositoryId, current);
-        }
-        return Array.from(map.values()).sort((a, b) => b.count - a.count);
-    }, [recentSessions, repos]);
 
     return (
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -220,9 +228,9 @@ export function OverviewDashboard() {
                 )}
             </div>
 
-            {/* Analytics Section: Indexing Status Breakdown & Language Distribution */}
+            {/* Analytics Section: Repository Indexing Status (Donut Chart) & Language Distribution (Horizontal Bar Chart) */}
             <div className="grid gap-6 lg:grid-cols-2">
-                {/* Indexing Status Breakdown */}
+                {/* Repository Indexing Status Donut Chart */}
                 <Card className="rounded-xl border border-border/70 shadow-xs">
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between gap-2">
@@ -231,7 +239,7 @@ export function OverviewDashboard() {
                                     Repository Indexing Status
                                 </CardTitle>
                                 <CardDescription className="text-xs">
-                                    Current state of all {totalRepos} connected repositories
+                                    Distribution of index states across {totalRepos} connected repositories
                                 </CardDescription>
                             </div>
                             <Button
@@ -249,44 +257,87 @@ export function OverviewDashboard() {
                     </CardHeader>
                     <CardContent className="space-y-4 pt-1">
                         {reposQuery.isLoading ? (
-                            <Skeleton className="h-24 rounded-lg" />
+                            <Skeleton className="h-56 rounded-lg" />
                         ) : (
-                            <>
-                                {/* Segmented Progress Bar */}
-                                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
-                                    {readyPercentage > 0 && (
-                                        <div
-                                            style={{ width: `${readyPercentage}%` }}
-                                            className="bg-emerald-500 transition-all"
-                                            title={`Ready: ${readyCount} (${readyPercentage}%)`}
-                                        />
-                                    )}
-                                    {indexingPercentage > 0 && (
-                                        <div
-                                            style={{ width: `${indexingPercentage}%` }}
-                                            className="bg-sky-500 transition-all"
-                                            title={`Indexing: ${indexingCount} (${indexingPercentage}%)`}
-                                        />
-                                    )}
-                                    {pendingPercentage > 0 && (
-                                        <div
-                                            style={{ width: `${pendingPercentage}%` }}
-                                            className="bg-amber-500 transition-all"
-                                            title={`Pending: ${pendingCount} (${pendingPercentage}%)`}
-                                        />
-                                    )}
-                                    {failedPercentage > 0 && (
-                                        <div
-                                            style={{ width: `${failedPercentage}%` }}
-                                            className="bg-rose-500 transition-all"
-                                            title={`Failed: ${failedCount} (${failedPercentage}%)`}
-                                        />
-                                    )}
+                            <div className="flex flex-col items-center">
+                                {/* Donut Chart */}
+                                <div className="h-48 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Tooltip
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const data = payload[0].payload;
+                                                        if (totalRepos === 0) return null;
+                                                        return (
+                                                            <div className="rounded-lg border border-border bg-popover px-3 py-1.5 text-xs shadow-md">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span
+                                                                        className="size-2 rounded-full"
+                                                                        style={{ backgroundColor: data.color }}
+                                                                    />
+                                                                    <span className="font-semibold text-foreground">{data.name}</span>
+                                                                </div>
+                                                                <p className="mt-1 text-muted-foreground">
+                                                                    {data.value} {data.value === 1 ? "repository" : "repositories"} ({data.percentage}%)
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Pie
+                                                data={indexingChartData}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                innerRadius={55}
+                                                outerRadius={75}
+                                                paddingAngle={indexingChartData.length > 1 ? 3 : 0}
+                                                strokeWidth={2}
+                                                stroke="var(--background)"
+                                            >
+                                                {indexingChartData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                                <Label
+                                                    content={({ viewBox }) => {
+                                                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                                                            return (
+                                                                <text
+                                                                    x={viewBox.cx}
+                                                                    y={viewBox.cy}
+                                                                    textAnchor="middle"
+                                                                    dominantBaseline="middle"
+                                                                >
+                                                                    <tspan
+                                                                        x={viewBox.cx}
+                                                                        y={(viewBox.cy || 0) - 3}
+                                                                        className="fill-foreground font-heading text-2xl font-bold"
+                                                                    >
+                                                                        {totalRepos}
+                                                                    </tspan>
+                                                                    <tspan
+                                                                        x={viewBox.cx}
+                                                                        y={(viewBox.cy || 0) + 18}
+                                                                        className="fill-muted-foreground text-[11px] font-medium"
+                                                                    >
+                                                                        Total Repos
+                                                                    </tspan>
+                                                                </text>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    }}
+                                                />
+                                            </Pie>
+                                        </PieChart>
+                                    </ResponsiveContainer>
                                 </div>
 
                                 {/* Status Legend Grid */}
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                                <div className="grid w-full grid-cols-2 gap-2.5 pt-2 sm:grid-cols-4">
+                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/20 p-2.5">
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <span className="size-2 rounded-full bg-emerald-500" />
                                             <span>Ready</span>
@@ -295,11 +346,11 @@ export function OverviewDashboard() {
                                             {readyCount}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {readyPercentage}% of total
+                                            {readyPercentage}%
                                         </span>
                                     </div>
 
-                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/20 p-2.5">
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <span className="size-2 rounded-full bg-sky-500" />
                                             <span>Indexing</span>
@@ -308,11 +359,11 @@ export function OverviewDashboard() {
                                             {indexingCount}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {indexingPercentage}% of total
+                                            {indexingPercentage}%
                                         </span>
                                     </div>
 
-                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/20 p-2.5">
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <span className="size-2 rounded-full bg-amber-500" />
                                             <span>Pending</span>
@@ -321,11 +372,11 @@ export function OverviewDashboard() {
                                             {pendingCount}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {pendingPercentage}% of total
+                                            {pendingPercentage}%
                                         </span>
                                     </div>
 
-                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                                    <div className="flex flex-col rounded-lg border border-border/60 bg-muted/20 p-2.5">
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                             <span className="size-2 rounded-full bg-rose-500" />
                                             <span>Failed</span>
@@ -334,212 +385,180 @@ export function OverviewDashboard() {
                                             {failedCount}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {failedPercentage}% of total
+                                            {failedPercentage}%
                                         </span>
                                     </div>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Language Distribution */}
+                {/* Repository Languages Horizontal Bar Chart */}
                 <Card className="rounded-xl border border-border/70 shadow-xs">
                     <CardHeader className="pb-3">
                         <CardTitle className="font-heading text-sm font-semibold">
-                            Language Distribution
+                            Repository Languages
                         </CardTitle>
                         <CardDescription className="text-xs">
-                            Primary programming languages across connected repositories
+                            Distribution of primary programming languages across repositories
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-1">
+                    <CardContent className="pt-1">
                         {reposQuery.isLoading ? (
-                            <Skeleton className="h-24 rounded-lg" />
+                            <Skeleton className="h-56 rounded-lg" />
                         ) : languageDistribution.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">No language data available.</p>
+                            <div className="flex h-56 flex-col items-center justify-center text-center">
+                                <p className="text-xs text-muted-foreground">No language data available.</p>
+                            </div>
                         ) : (
-                            <>
-                                {/* Segmented Language Bar */}
-                                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
-                                    {languageDistribution.slice(0, 6).map((lang) => (
-                                        <div
-                                            key={lang.name}
-                                            style={{
-                                                width: `${lang.percentage}%`,
-                                                backgroundColor: lang.color,
-                                            }}
-                                            className="transition-all"
-                                            title={`${lang.name}: ${lang.count} (${lang.percentage}%)`}
+                            <div className="h-56 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={languageDistribution.slice(0, 6)}
+                                        layout="vertical"
+                                        margin={{ top: 8, right: 45, left: 10, bottom: 8 }}
+                                    >
+                                        <XAxis type="number" hide />
+                                        <YAxis
+                                            dataKey="name"
+                                            type="category"
+                                            tickLine={false}
+                                            axisLine={false}
+                                            width={85}
+                                            tick={{ fontSize: 12, fill: "var(--foreground)" }}
                                         />
-                                    ))}
-                                </div>
-
-                                {/* Top Languages List */}
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                    {languageDistribution.slice(0, 6).map((lang) => (
-                                        <div
-                                            key={lang.name}
-                                            className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-2.5 py-1.5 text-xs"
-                                        >
-                                            <div className="flex items-center gap-1.5 truncate">
-                                                <span
-                                                    className="size-2 shrink-0 rounded-full"
-                                                    style={{ backgroundColor: lang.color }}
-                                                />
-                                                <span className="truncate font-medium">{lang.name}</span>
-                                            </div>
-                                            <span className="ml-1 shrink-0 text-muted-foreground">
-                                                {lang.count} ({lang.percentage}%)
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
+                                        <Tooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const data = payload[0].payload;
+                                                    return (
+                                                        <div className="rounded-lg border border-border bg-popover px-3 py-1.5 text-xs shadow-md">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span
+                                                                    className="size-2 rounded-full"
+                                                                    style={{ backgroundColor: data.color }}
+                                                                />
+                                                                <span className="font-semibold text-foreground">{data.name}</span>
+                                                            </div>
+                                                            <p className="mt-1 text-muted-foreground">
+                                                                {data.count} {data.count === 1 ? "repository" : "repositories"} ({data.percentage}%)
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                            {languageDistribution.slice(0, 6).map((entry, index) => (
+                                                <Cell key={`lang-cell-${index}`} fill={entry.color} />
+                                            ))}
+                                            <LabelList
+                                                dataKey="count"
+                                                position="right"
+                                                formatter={(val: unknown) => {
+                                                    const count = Number(val);
+                                                    const pct = totalRepos > 0 ? Math.round((count / totalRepos) * 100) : 0;
+                                                    return `${count} (${pct}%)`;
+                                                }}
+                                                className="fill-muted-foreground text-[11px] font-medium"
+                                            />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Bottom Section: Recent Conversations & Activity by Repo */}
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                {/* Recent Conversations */}
-                <Card className="rounded-xl border border-border/70 shadow-xs">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-2">
-                            <div>
-                                <CardTitle className="font-heading text-sm font-semibold">
-                                    Recent Conversations
-                                </CardTitle>
-                                <CardDescription className="text-xs">
-                                    Jump back into your recent chat sessions
-                                </CardDescription>
-                            </div>
+            {/* Bottom Section: Single Useful Recent Conversations Section */}
+            <Card className="rounded-xl border border-border/70 shadow-xs">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <CardTitle className="font-heading text-sm font-semibold">
+                                Recent Conversations
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                                Jump back into your recent chat sessions
+                            </CardDescription>
+                        </div>
+                        <Link
+                            href="/dashboard"
+                            className="text-xs font-medium text-primary hover:underline"
+                        >
+                            All repositories
+                        </Link>
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-1">
+                    {recentSessionsQuery.isLoading ? (
+                        <div className="space-y-2">
+                            {Array.from({ length: 4 }).map((_, index) => (
+                                <Skeleton key={index} className="h-12 rounded-lg" />
+                            ))}
+                        </div>
+                    ) : recentSessions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+                            <MessageSquare className="size-8 text-muted-foreground/40" />
+                            <p className="text-sm font-medium text-foreground">No conversations yet</p>
+                            <p className="text-xs text-muted-foreground max-w-sm">
+                                Open any indexed repository from the Repositories page to start chatting with your codebase.
+                            </p>
                             <Link
                                 href="/dashboard"
-                                className="text-xs font-medium text-primary hover:underline"
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                             >
-                                All repositories
+                                Browse repositories
+                                <ArrowRight className="size-3" />
                             </Link>
                         </div>
-                    </CardHeader>
-                    <CardContent className="pt-1">
-                        {recentSessionsQuery.isLoading ? (
-                            <div className="space-y-2">
-                                {Array.from({ length: 4 }).map((_, index) => (
-                                    <Skeleton key={index} className="h-12 rounded-lg" />
-                                ))}
-                            </div>
-                        ) : recentSessions.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                                <MessageSquare className="size-8 text-muted-foreground/40" />
-                                <p className="text-sm font-medium text-foreground">No conversations yet</p>
-                                <p className="text-xs text-muted-foreground max-w-sm">
-                                    Open any indexed repository from the Repositories page to start chatting with your codebase.
-                                </p>
-                                <Link
-                                    href="/dashboard"
-                                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                                >
-                                    Browse repositories
-                                    <ArrowRight className="size-3" />
-                                </Link>
-                            </div>
-                        ) : (
-                            <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
-                                {recentSessions.map((session) => {
-                                    const repo = repos.find((r) => r.id === session.repositoryId);
-                                    return (
-                                        <Link
-                                            key={session.id}
-                                            href={`/chat/${session.repositoryId}?sessionId=${session.id}`}
-                                            className="group flex items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/40"
-                                        >
-                                            <div className="flex min-w-0 items-center gap-2.5">
-                                                <div className="rounded-md bg-muted/60 p-1.5 text-muted-foreground group-hover:text-foreground">
-                                                    <MessageSquare className="size-3.5" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-xs font-medium text-foreground group-hover:text-primary">
-                                                        {session.title || "Untitled conversation"}
-                                                    </p>
-                                                    <p className="truncate text-[11px] text-muted-foreground">
-                                                        {repo?.fullName || "Repository"}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                                                {session.isShared && (
-                                                    <span className="inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                        <Share2 className="size-2.5" />
-                                                        Shared
-                                                    </span>
-                                                )}
-                                                <span className="inline-flex items-center gap-1 text-[11px]">
-                                                    <Clock className="size-3" />
-                                                    {formatRelativeTime(session.createdAt)}
-                                                </span>
-                                                <ArrowRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
-                                            </div>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Recent Conversations by Repository */}
-                <Card className="rounded-xl border border-border/70 shadow-xs">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="font-heading text-sm font-semibold">
-                            Recent Chat Activity
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                            Repositories active in your latest 10 chat sessions
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-1">
-                        {recentSessionsQuery.isLoading ? (
-                            <div className="space-y-2">
-                                {Array.from({ length: 3 }).map((_, index) => (
-                                    <Skeleton key={index} className="h-10 rounded-lg" />
-                                ))}
-                            </div>
-                        ) : recentConversationsByRepo.length === 0 ? (
-                            <div className="py-6 text-center text-xs text-muted-foreground">
-                                No active repositories yet.
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {recentConversationsByRepo.map((item) => (
-                                    <div
-                                        key={item.repoId}
-                                        className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-2.5 text-xs transition-colors hover:bg-muted/40"
+                    ) : (
+                        <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
+                            {recentSessions.map((session) => {
+                                const repo = repos.find((r) => r.id === session.repositoryId);
+                                return (
+                                    <Link
+                                        key={session.id}
+                                        href={`/chat/${session.repositoryId}?sessionId=${session.id}`}
+                                        className="group flex items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/40"
                                     >
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate font-medium text-foreground">
-                                                {item.repoName}
-                                            </p>
-                                            <p className="text-[11px] text-muted-foreground">
-                                                {item.count} {item.count === 1 ? "session" : "sessions"} in recent chats
-                                            </p>
+                                        <div className="flex min-w-0 items-center gap-2.5">
+                                            <div className="rounded-md bg-muted/60 p-1.5 text-muted-foreground group-hover:text-foreground">
+                                                <MessageSquare className="size-3.5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate text-xs font-medium text-foreground group-hover:text-primary">
+                                                    {session.title || "Untitled conversation"}
+                                                </p>
+                                                <p className="truncate text-[11px] text-muted-foreground">
+                                                    {repo?.fullName || "Repository"}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <Link
-                                            href={`/chat/${item.repoId}`}
-                                            className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-background px-2 py-1 text-[11px] font-medium text-foreground shadow-2xs hover:bg-muted"
-                                        >
-                                            <span>Chat</span>
-                                            <ArrowRight className="size-2.5" />
-                                        </Link>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
+
+                                        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                                            {session.isShared && (
+                                                <span className="inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                    <Share2 className="size-2.5" />
+                                                    Shared
+                                                </span>
+                                            )}
+                                            <span className="inline-flex items-center gap-1 text-[11px]">
+                                                <Clock className="size-3" />
+                                                {formatRelativeTime(session.createdAt)}
+                                            </span>
+                                            <ArrowRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 }

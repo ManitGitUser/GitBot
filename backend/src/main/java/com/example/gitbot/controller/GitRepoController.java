@@ -29,13 +29,16 @@ public class GitRepoController {
     public com.example.gitbot.dto.PageResponse<GitRepoResponse> listAll(
             @RequestParam(name = "refresh", defaultValue = "false") boolean refresh,
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "10") int size
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "visibility", required = false) String visibility,
+            @RequestParam(name = "search", required = false) String search
     ) {
         UUID userId = currentUser.require().getId();
         if (refresh) {
             gitRepoService.syncAndListGitRepos(userId);
         }
-        return gitRepoService.listStored(userId, org.springframework.data.domain.PageRequest.of(page, size));
+        return gitRepoService.listStored(userId, status, visibility, search, org.springframework.data.domain.PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")

@@ -5,7 +5,13 @@ export const queryKeys = {
     },
     repos: {
         all: ["repos"] as const,
-        list: (page = 0, size = 10) => [...queryKeys.repos.all, "list", { page, size }] as const,
+        list: (
+            page = 0,
+            size = 10,
+            status = "ALL",
+            visibility = "all",
+            search = ""
+        ) => [...queryKeys.repos.all, "list", { page, size, status, visibility, search }] as const,
         detail: (id: string) => [...queryKeys.repos.all, "detail", id] as const,
         status: (id: string) => [...queryKeys.repos.all, "status", id] as const,
     },

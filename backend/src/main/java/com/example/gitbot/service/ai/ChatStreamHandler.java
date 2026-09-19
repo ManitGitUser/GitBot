@@ -167,11 +167,14 @@ public class ChatStreamHandler {
             return;
         }
         try {
+            String fullReply = stream.fullReply.toString();
+            List<CitationDto> supporting = citationMapper.filterSupportingCitations(fullReply, stream.citations);
+
             ChatMessage assistant = persistAssistantMessage(
                     stream.sessionId,
                     stream.targetAssistantMessageId,
-                    stream.fullReply.toString(),
-                    stream.citations,
+                    fullReply,
+                    supporting,
                     MessageStatus.COMPLETE
             );
 
@@ -201,11 +204,12 @@ public class ChatStreamHandler {
         }
         try {
             String partial = stream.fullReply.toString();
+            List<CitationDto> supporting = citationMapper.filterSupportingCitations(partial, stream.citations);
             ChatMessage assistant = persistAssistantMessage(
                     stream.sessionId,
                     stream.targetAssistantMessageId,
                     partial.isBlank() ? "Generation interrupted." : partial,
-                    stream.citations,
+                    supporting,
                     MessageStatus.INTERRUPTED
             );
 
@@ -237,7 +241,7 @@ public class ChatStreamHandler {
                     stream.sessionId,
                     stream.targetAssistantMessageId,
                     partial.isBlank() ? "Generation failed: " + err.getMessage() : partial,
-                    stream.citations,
+                    List.of(),
                     MessageStatus.FAILED
             );
 
@@ -288,12 +292,16 @@ public class ChatStreamHandler {
     }
 
     public ChatMessageResponse toMessageResponse(ChatMessage message) {
+        List<CitationDto> citations = citationMapper.fromJson(message.getCitations());
+        if (message.getRole() == MessageRole.ASSISTANT && message.getContent() != null) {
+            citations = citationMapper.filterSupportingCitations(message.getContent(), citations);
+        }
         return new ChatMessageResponse(
                 message.getId(),
                 message.getRole(),
                 message.getStatus() != null ? message.getStatus() : MessageStatus.COMPLETE,
                 message.getContent(),
-                citationMapper.fromJson(message.getCitations()),
+                citations,
                 message.getCreatedAt()
         );
     }

@@ -142,4 +142,91 @@ class CitationMapperTest {
         assertThat(citationMapper.fromJson("   ")).isEmpty();
         assertThat(citationMapper.fromJson("invalid-json")).isEmpty();
     }
+
+    @Test
+    void irrelevantQuestion_returnsZeroCitations() {
+        List<CitationDto> candidates = List.of(
+                new CitationDto("client/components/ui/button-group.tsx", 1, 30, "typescript", "org/repo"),
+                new CitationDto("client/components/ui/calendar.tsx", 1, 50, "typescript", "org/repo"),
+                new CitationDto("client/components/ui/sidebar.tsx", 1, 40, "typescript", "org/repo")
+        );
+
+        String reply1 = "The provided context does not contain any information or relevant source code related to \"bund\". Please clarify your question or provide more context so I can assist you effectively.";
+        assertThat(citationMapper.filterSupportingCitations(reply1, candidates)).isEmpty();
+
+        String reply2 = "The provided context does not mention anything about this topic.";
+        assertThat(citationMapper.filterSupportingCitations(reply2, candidates)).isEmpty();
+
+        String reply3 = "Based on the provided context, there is no information available regarding the requested feature.";
+        assertThat(citationMapper.filterSupportingCitations(reply3, candidates)).isEmpty();
+
+        String reply4 = "The provided code context does not contain relevant source code for this query.";
+        assertThat(citationMapper.filterSupportingCitations(reply4, candidates)).isEmpty();
+    }
+
+    @Test
+    void casualConversation_returnsZeroCitations() {
+        List<CitationDto> candidates = List.of(
+                new CitationDto("client/components/ui/button-group.tsx", 1, 30, "typescript", "org/repo"),
+                new CitationDto("client/components/ui/calendar.tsx", 1, 50, "typescript", "org/repo")
+        );
+
+        String greeting1 = "Hello! I am GitBot, your technical assistant for this repository. How can I help you with the codebase today?";
+        assertThat(citationMapper.filterSupportingCitations(greeting1, candidates)).isEmpty();
+
+        String greeting2 = "Hi! How can I assist you with the repository today?";
+        assertThat(citationMapper.filterSupportingCitations(greeting2, candidates)).isEmpty();
+
+        String greeting3 = "I'm doing well, thank you! Feel free to ask any questions about the code.";
+        assertThat(citationMapper.filterSupportingCitations(greeting3, candidates)).isEmpty();
+
+        String pleasantry = "You're welcome! Let me know if you need anything else.";
+        assertThat(citationMapper.filterSupportingCitations(pleasantry, candidates)).isEmpty();
+    }
+
+    @Test
+    void repositoryGroundedAnswer_returnsOnlySupportingCitations() {
+        CitationDto securityConfig = new CitationDto("backend/src/main/java/com/example/gitbot/config/SecurityConfig.java", 1, 50, "java", "org/repo");
+        CitationDto userService = new CitationDto("backend/src/main/java/com/example/gitbot/service/UserService.java", 1, 60, "java", "org/repo");
+        CitationDto buttonGroup = new CitationDto("client/components/ui/button-group.tsx", 1, 30, "typescript", "org/repo");
+
+        List<CitationDto> candidates = List.of(securityConfig, userService, buttonGroup);
+
+        // Reply references SecurityConfig.java
+        String reply = "GitHub OAuth is configured in `backend/src/main/java/com/example/gitbot/config/SecurityConfig.java` in the `securityFilterChain` method.";
+        List<CitationDto> supporting = citationMapper.filterSupportingCitations(reply, candidates);
+
+        assertThat(supporting).hasSize(1);
+        assertThat(supporting.get(0).filePath()).isEqualTo("backend/src/main/java/com/example/gitbot/config/SecurityConfig.java");
+
+        // Reply references both SecurityConfig and UserService
+        String multiReply = "Authentication is set up in `SecurityConfig.java`, while user details and GitHub tokens are handled in `UserService.java`.";
+        List<CitationDto> multiSupporting = citationMapper.filterSupportingCitations(multiReply, candidates);
+
+        assertThat(multiSupporting).hasSize(2);
+        assertThat(multiSupporting).extracting(CitationDto::filePath).containsExactlyInAnyOrder(
+                "backend/src/main/java/com/example/gitbot/config/SecurityConfig.java",
+                "backend/src/main/java/com/example/gitbot/service/UserService.java"
+        );
+    }
+
+    @Test
+    void dynamicRouteCitation_returnsMatchingCitation() {
+        CitationDto sharePage = new CitationDto("client/app/share/[shareToken]/page.tsx", 1, 100, "typescript", "org/repo");
+        CitationDto buttonGroup = new CitationDto("client/components/ui/button-group.tsx", 1, 30, "typescript", "org/repo");
+
+        List<CitationDto> candidates = List.of(sharePage, buttonGroup);
+
+        // Reference using full path
+        String reply1 = "The public share page is defined in `client/app/share/[shareToken]/page.tsx`.";
+        List<CitationDto> res1 = citationMapper.filterSupportingCitations(reply1, candidates);
+        assertThat(res1).hasSize(1);
+        assertThat(res1.get(0).filePath()).isEqualTo("client/app/share/[shareToken]/page.tsx");
+
+        // Reference using dynamic segment [shareToken]
+        String reply2 = "You can view shared conversations at the `/share/[shareToken]` route.";
+        List<CitationDto> res2 = citationMapper.filterSupportingCitations(reply2, candidates);
+        assertThat(res2).hasSize(1);
+        assertThat(res2.get(0).filePath()).isEqualTo("client/app/share/[shareToken]/page.tsx");
+    }
 }

@@ -2,7 +2,6 @@
 
 import {
     AlertCircle,
-    Bot,
     Check,
     ChevronDown,
     Copy,
@@ -17,7 +16,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { CitationChips } from "@/components/chat/citation-chips";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { GitBotIcon } from "@/components/icons/gitbot-icon";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { useCurrentUser } from "@/hooks/use-auth";
 import type { ChatMessage, Repository } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +196,7 @@ export function ChatMessages({
     onReport?: (message: ChatMessage) => void;
     onShare?: () => void;
 }) {
+    const { data: user } = useCurrentUser();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const isScrolledUpRef = useRef(false);
@@ -297,19 +299,23 @@ export function ChatMessages({
                                 >
                                     <MessageAvatar>
                                         <Avatar className="size-8">
-                                            <AvatarFallback
-                                                className={cn(
-                                                    isUser
-                                                        ? "bg-primary text-primary-foreground"
-                                                        : "bg-muted"
-                                                )}
-                                            >
-                                                {isUser ? (
-                                                    <UserRound className="size-4" />
-                                                ) : (
-                                                    <Bot className="size-4" />
-                                                )}
-                                            </AvatarFallback>
+                                            {isUser ? (
+                                                <>
+                                                    {user?.avatarUrl && (
+                                                        <AvatarImage
+                                                            src={user.avatarUrl}
+                                                            alt={user.displayName || user.githubUsername || "User"}
+                                                        />
+                                                    )}
+                                                    <AvatarFallback className="bg-primary text-primary-foreground">
+                                                        <UserRound className="size-4" />
+                                                    </AvatarFallback>
+                                                </>
+                                            ) : (
+                                                <AvatarFallback className="bg-transparent p-0">
+                                                    <GitBotIcon className="size-8" />
+                                                </AvatarFallback>
+                                            )}
                                         </Avatar>
                                     </MessageAvatar>
                                     <MessageContent>
@@ -399,8 +405,8 @@ export function ChatMessages({
                             <Message align="start">
                                 <MessageAvatar>
                                     <Avatar className="size-8">
-                                        <AvatarFallback className="bg-muted">
-                                            <Bot className="size-4" />
+                                        <AvatarFallback className="bg-transparent p-0">
+                                            <GitBotIcon className="size-8" />
                                         </AvatarFallback>
                                     </Avatar>
                                 </MessageAvatar>

@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, Sparkles } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
+import { FeatureTutorial, ONBOARDING_STORAGE_KEY } from "@/components/onboarding/feature-tutorial";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useCurrentUser, useLogout } from "@/hooks/use-auth";
@@ -56,8 +58,22 @@ export function AppShell({
 }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { data: user } = useCurrentUser();
+    const { data: user, isLoading: isAuthLoading } = useCurrentUser();
     const logout = useLogout();
+    const [tutorialOpen, setTutorialOpen] = useState(false);
+
+    useEffect(() => {
+        // Only open tutorial if user is confirmed authenticated and hasn't completed onboarding
+        if (isAuthLoading || !user) return;
+        try {
+            const completed = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+            if (completed !== "true") {
+                setTimeout(() => setTutorialOpen(true), 0);
+            }
+        } catch {
+            // ignore
+        }
+    }, [user, isAuthLoading]);
 
     return (
         <SidebarProvider>
@@ -108,6 +124,23 @@ export function AppShell({
                             </SidebarGroupContent>
                         </SidebarGroup>
                     ))}
+
+                    <SidebarGroup>
+                        <SidebarGroupLabel>Help & Resources</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        onClick={() => setTutorialOpen(true)}
+                                        tooltip="Feature Tutorial"
+                                    >
+                                        <Sparkles />
+                                        <span>Feature Tutorial</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
                 </SidebarContent>
 
                 <SidebarFooter>
@@ -159,6 +192,10 @@ export function AppShell({
                                         </DropdownMenuLabel>
                                     </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setTutorialOpen(true)}>
+                                        <Sparkles />
+                                        Feature Tutorial
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
                                         <Settings />
                                         Settings
@@ -205,6 +242,8 @@ export function AppShell({
                 )}
                 <div className="flex flex-1 flex-col">{children}</div>
             </SidebarInset>
+
+            <FeatureTutorial open={tutorialOpen} onOpenChange={setTutorialOpen} />
         </SidebarProvider>
     );
 }

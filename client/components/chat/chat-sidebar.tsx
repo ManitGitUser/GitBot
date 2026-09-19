@@ -59,11 +59,15 @@ export function ChatSidebar({
     sessionId,
     onSelectSession,
     onSessionDeleted,
+    className,
+    style,
 }: {
     repo: Repository;
     sessionId: string | null;
     onSelectSession: (id: string) => void;
     onSessionDeleted?: (id: string) => void;
+    className?: string;
+    style?: React.CSSProperties;
 }) {
     const ready = repo.indexStatus === "READY";
     const sessionsQuery = useChatSessions(repo.id, ready);
@@ -86,8 +90,8 @@ export function ChatSidebar({
         return allSessions.filter((s) => s.title.toLowerCase().includes(q));
     }, [allSessions, searchQuery]);
 
-    function startRename(session: ChatSession, e: React.MouseEvent) {
-        e.stopPropagation();
+    function startRename(session: ChatSession, e?: React.MouseEvent) {
+        e?.stopPropagation();
         setRenamingSession(session);
         setRenameTitle(session.title);
     }
@@ -102,8 +106,8 @@ export function ChatSidebar({
         );
     }
 
-    function startDelete(session: ChatSession, e: React.MouseEvent) {
-        e.stopPropagation();
+    function startDelete(session: ChatSession, e?: React.MouseEvent) {
+        e?.stopPropagation();
         setDeletingSession(session);
     }
 
@@ -121,7 +125,13 @@ export function ChatSidebar({
     }
 
     return (
-        <aside className="flex w-full flex-col border-b bg-card/40 md:w-72 md:border-r md:border-b-0">
+        <aside
+            style={style}
+            className={cn(
+                "flex w-full shrink-0 flex-col border-b bg-card/40 md:border-r md:border-b-0",
+                className
+            )}
+        >
             <div className="space-y-3 p-4">
                 <div className="space-y-1">
                     <p className="truncate text-sm font-medium">{repo.fullName}</p>
@@ -221,25 +231,20 @@ export function ChatSidebar({
                         return (
                             <div
                                 key={session.id}
-                                onClick={() => onSelectSession(session.id)}
                                 className={cn(
-                                    "group relative flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/80",
+                                    "group relative flex items-center justify-between rounded-xl transition-colors hover:bg-muted/80",
                                     isSelected
-                                        ? "bg-muted font-medium text-foreground shadow-2xs border-l-2 border-primary pl-2.5"
+                                        ? "bg-muted font-medium text-foreground shadow-2xs border-l-2 border-primary"
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
-                                role="button"
-                                tabIndex={0}
-                                aria-current={isSelected ? "page" : undefined}
-                                aria-label={`Conversation: ${session.title}`}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        onSelectSession(session.id);
-                                    }
-                                }}
                             >
-                                <div className="min-w-0 flex-1 pr-2">
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectSession(session.id)}
+                                    className="min-w-0 flex-1 px-3 py-2.5 text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-l-xl"
+                                    aria-current={isSelected ? "page" : undefined}
+                                    aria-label={`Conversation: ${session.title}`}
+                                >
                                     <div className="flex items-center gap-1.5">
                                         {isBranch && (
                                             <span title="Branched conversation" className="inline-flex shrink-0">
@@ -256,9 +261,9 @@ export function ChatSidebar({
                                             addSuffix: true,
                                         })}
                                     </p>
-                                </div>
+                                </button>
 
-                                <div className="opacity-100 sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <div className="pr-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger
                                             render={
@@ -266,7 +271,6 @@ export function ChatSidebar({
                                                     variant="ghost"
                                                     size="icon"
                                                     className="size-7 text-muted-foreground hover:text-foreground"
-                                                    onClick={(e) => e.stopPropagation()}
                                                     aria-label={`Options for ${session.title}`}
                                                 />
                                             }

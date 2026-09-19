@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     AlertCircle,
     ArrowLeft,
@@ -121,6 +121,86 @@ export function ChatView({ repoId }: { repoId: string }) {
     const [reportDetails, setReportDetails] = useState("");
     const [reportSuccess, setReportSuccess] = useState(false);
     const [reportError, setReportError] = useState<string | null>(null);
+
+    // Resizable Sidebar State
+    const MIN_SIDEBAR_WIDTH = 220;
+    const MAX_SIDEBAR_WIDTH = 480;
+    const DEFAULT_SIDEBAR_WIDTH = 288;
+    const SIDEBAR_STORAGE_KEY = "gitbot:chat-sidebar-width";
+
+    const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+    const [isDragging, setIsDragging] = useState(false);
+    const sidebarWidthRef = useRef(sidebarWidth);
+
+    useEffect(() => {
+        sidebarWidthRef.current = sidebarWidth;
+    }, [sidebarWidth]);
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+            if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!Number.isNaN(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
+                    setTimeout(() => setSidebarWidth(parsed), 0);
+                }
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+        const startX = e.clientX;
+        const startWidth = sidebarWidthRef.current;
+
+        const onPointerMove = (moveEvent: PointerEvent) => {
+            const delta = moveEvent.clientX - startX;
+            const newWidth = Math.min(
+                MAX_SIDEBAR_WIDTH,
+                Math.max(MIN_SIDEBAR_WIDTH, startWidth + delta)
+            );
+            setSidebarWidth(newWidth);
+        };
+
+        const onPointerUp = () => {
+            setIsDragging(false);
+            document.removeEventListener("pointermove", onPointerMove);
+            document.removeEventListener("pointerup", onPointerUp);
+            document.body.style.removeProperty("cursor");
+            document.body.style.removeProperty("user-select");
+            try {
+                localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarWidthRef.current));
+            } catch {
+                // ignore
+            }
+        };
+
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        document.addEventListener("pointermove", onPointerMove);
+        document.addEventListener("pointerup", onPointerUp);
+    }, []);
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            const next = Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth - 16);
+            setSidebarWidth(next);
+            try {
+                localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+            } catch {}
+        } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            const next = Math.min(MAX_SIDEBAR_WIDTH, sidebarWidth + 16);
+            setSidebarWidth(next);
+            try {
+                localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+            } catch {}
+        }
+    };
 
     useEffect(() => {
         if (!ready || sessionsQuery.isLoading) return;
@@ -297,6 +377,12 @@ export function ChatView({ repoId }: { repoId: string }) {
         >
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
                 <ChatSidebar
+                    style={
+                        {
+                            "--chat-sidebar-width": `${sidebarWidth}px`,
+                        } as React.CSSProperties
+                    }
+                    className="md:w-[var(--chat-sidebar-width)]"
                     repo={{
                         ...repo,
                         indexStatus: indexStatus ?? repo.indexStatus,
@@ -313,6 +399,26 @@ export function ChatView({ repoId }: { repoId: string }) {
                         }
                     }}
                 />
+
+                {/* Draggable resize handle */}
+                <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize sidebar split"
+                    aria-valuenow={sidebarWidth}
+                    aria-valuemin={MIN_SIDEBAR_WIDTH}
+                    aria-valuemax={MAX_SIDEBAR_WIDTH}
+                    tabIndex={0}
+                    onPointerDown={handlePointerDown}
+                    onKeyDown={handleKeyDown}
+                    className={cn(
+                        "relative hidden md:flex w-1.5 -ml-1 cursor-col-resize select-none items-center justify-center transition-colors group z-10",
+                        "hover:bg-primary/20 active:bg-primary/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+                        isDragging && "bg-primary/40"
+                    )}
+                >
+                    <div className="h-8 w-0.5 rounded-full bg-muted-foreground/30 group-hover:bg-primary/60 transition-colors" />
+                </div>
 
                 <section className="flex min-h-[70vh] min-w-0 flex-1 flex-col">
                     {!ready ? (

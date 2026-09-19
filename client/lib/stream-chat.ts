@@ -65,6 +65,8 @@ export async function streamChatMessage(
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
+        // Normalize CRLF to LF so SSE event boundaries and lines split consistently
+        buffer = buffer.replace(/\r\n/g, "\n");
         const parts = buffer.split("\n\n");
         buffer = parts.pop() ?? "";
 
@@ -79,7 +81,9 @@ export async function streamChatMessage(
                 if (line.startsWith("event:")) {
                     event = line.slice(6).trim();
                 } else if (line.startsWith("data:")) {
-                    dataLines.push(line.slice(5).trimStart());
+                    // Per WHATWG SSE spec: remove single leading space after 'data:' if present
+                    const rawLine = line.startsWith("data: ") ? line.slice(6) : line.slice(5);
+                    dataLines.push(rawLine);
                 }
             }
 
@@ -88,7 +92,16 @@ export async function streamChatMessage(
 
             try {
                 if (event === "token") {
-                    handlers.onToken?.(JSON.parse(data) as string);
+                    let tokenText = data;
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (typeof parsed === "string") {
+                            tokenText = parsed;
+                        }
+                    } catch {
+                        // Data was already plain text, use as-is
+                    }
+                    handlers.onToken?.(tokenText);
                 } else if (event === "user_message") {
                     handlers.onUserMessage?.(JSON.parse(data) as ChatMessage);
                 } else if (event === "assistant_message") {

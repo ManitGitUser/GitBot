@@ -25,7 +25,7 @@ export function ChatMarkdown({
             mode={isStreaming ? "streaming" : "static"}
             plugins={streamdownPlugins}
             shikiTheme={["github-light", "github-dark"]}
-            isAnimating={isStreaming}
+            isAnimating={false}
         >
             {content}
         </Streamdown>

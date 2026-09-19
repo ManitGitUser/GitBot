@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, MessageSquare, RefreshCw, Settings, Sparkles } from "lucide-react";
+import { Info, LogOut, MessageSquare, RefreshCw, Settings, Sparkles } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { FeatureTutorial, ONBOARDING_STORAGE_KEY } from "@/components/onboarding/feature-tutorial";
+import { AboutGitBotDialog } from "@/components/about/about-gitbot-dialog";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useCurrentUser, useLogout, useSyncProfile } from "@/hooks/use-auth";
@@ -70,6 +71,7 @@ export function AppShell({
     const logout = useLogout();
     const syncProfile = useSyncProfile();
     const [tutorialOpen, setTutorialOpen] = useState(false);
+    const [aboutOpen, setAboutOpen] = useState(false);
 
     useEffect(() => {
         // Only open tutorial if user is confirmed authenticated and hasn't completed onboarding
@@ -92,9 +94,9 @@ export function AppShell({
                         <SidebarMenuItem>
                             <SidebarMenuButton
                                 size="lg"
-                                render={<Link href="/dashboard" />}
-                                tooltip="GitBot"
-                                className="group-data-[collapsible=icon]:justify-center"
+                                onClick={() => setAboutOpen(true)}
+                                tooltip="About GitBot"
+                                className="group-data-[collapsible=icon]:justify-center cursor-pointer"
                             >
                                 <GitBotIcon className="size-8 shrink-0 rounded-[10px]" />
                                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
@@ -187,6 +189,15 @@ export function AppShell({
                                         <span>Feature Tutorial</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        onClick={() => setAboutOpen(true)}
+                                        tooltip="About GitBot"
+                                    >
+                                        <Info />
+                                        <span>About GitBot</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -254,6 +265,10 @@ export function AppShell({
                                         <Sparkles />
                                         Feature Tutorial
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setAboutOpen(true)}>
+                                        <Info />
+                                        About GitBot
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
                                         <Settings />
                                         Settings
@@ -304,6 +319,7 @@ export function AppShell({
             </SidebarInset>
 
             <FeatureTutorial open={tutorialOpen} onOpenChange={setTutorialOpen} />
+            <AboutGitBotDialog open={aboutOpen} onOpenChange={setAboutOpen} />
         </SidebarProvider>
     );
 }

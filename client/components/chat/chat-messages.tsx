@@ -255,8 +255,10 @@ export function ChatMessages({
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const isScrolledUpRef = useRef(false);
+    const isProgrammaticScrollRef = useRef(false);
+    const prevMessageCountRef = useRef(messages.length);
 
-    // Attach scroll listener to scroll viewport to preserve user scroll position
+    // Attach scroll, wheel, and touch listeners to detect intentional user scrolling
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
@@ -267,15 +269,55 @@ export function ChatMessages({
         if (!viewport) return;
 
         const handleScroll = () => {
+            if (isProgrammaticScrollRef.current) {
+                isProgrammaticScrollRef.current = false;
+                return;
+            }
+
             const distanceFromBottom =
                 viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-            const scrolledUp = distanceFromBottom > 100;
-            isScrolledUpRef.current = scrolledUp;
-            setIsScrolledUp(scrolledUp);
+
+            // User is at/near the bottom (within 35px)
+            if (distanceFromBottom <= 35) {
+                if (isScrolledUpRef.current) {
+                    isScrolledUpRef.current = false;
+                    setIsScrolledUp(false);
+                }
+            } else if (distanceFromBottom > 45) {
+                // User has scrolled away from bottom
+                if (!isScrolledUpRef.current) {
+                    isScrolledUpRef.current = true;
+                    setIsScrolledUp(true);
+                }
+            }
+        };
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY < 0) {
+                // Upward wheel event: user intentionally wants to read earlier content
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+            }
+        };
+
+        const handleTouchMove = () => {
+            const distanceFromBottom =
+                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+            if (distanceFromBottom > 40) {
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+            }
         };
 
         viewport.addEventListener("scroll", handleScroll, { passive: true });
-        return () => viewport.removeEventListener("scroll", handleScroll);
+        viewport.addEventListener("wheel", handleWheel, { passive: true });
+        viewport.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+        return () => {
+            viewport.removeEventListener("scroll", handleScroll);
+            viewport.removeEventListener("wheel", handleWheel);
+            viewport.removeEventListener("touchmove", handleTouchMove);
+        };
     }, []);
 
     const handleLoadEarlier = async () => {
@@ -299,6 +341,27 @@ export function ChatMessages({
         });
     };
 
+    // When the user submits a new prompt, take them to bottom initially and reset scroll intent
+    useEffect(() => {
+        const lastMsg = messages[messages.length - 1];
+        if (messages.length > prevMessageCountRef.current && lastMsg?.role === "USER") {
+            isScrolledUpRef.current = false;
+            setIsScrolledUp(false);
+            const container = scrollContainerRef.current;
+            const viewport = container?.querySelector(
+                '[data-slot="scroll-area-viewport"]'
+            ) as HTMLElement | null;
+            if (viewport) {
+                isProgrammaticScrollRef.current = true;
+                viewport.scrollTo({
+                    top: viewport.scrollHeight,
+                    behavior: "smooth",
+                });
+            }
+        }
+        prevMessageCountRef.current = messages.length;
+    }, [messages]);
+
     // Auto-scroll when new messages or tokens arrive, ONLY IF user hasn't scrolled up and not loading earlier
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -309,7 +372,9 @@ export function ChatMessages({
         ) as HTMLElement | null;
         if (!viewport) return;
 
+        // User scroll intent takes priority over streaming auto-scroll
         if (!isScrolledUpRef.current && !isLoadingEarlier) {
+            isProgrammaticScrollRef.current = true;
             viewport.scrollTo({
                 top: viewport.scrollHeight,
                 behavior: streaming ? "instant" : "smooth",
@@ -327,6 +392,7 @@ export function ChatMessages({
 
         isScrolledUpRef.current = false;
         setIsScrolledUp(false);
+        isProgrammaticScrollRef.current = true;
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
     }
 
@@ -546,18 +612,18 @@ export function ChatMessages({
                 </div>
             </ScrollArea>
 
-            {/* Jump to bottom button if user scrolled up */}
+            {/* Jump to latest button if user scrolled up */}
             {isScrolledUp && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center z-20">
                     <Button
                         size="sm"
                         variant="secondary"
-                        className="pointer-events-auto gap-1.5 rounded-full border bg-background/90 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-transform hover:scale-105 active:scale-95"
+                        className="pointer-events-auto gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-transform hover:scale-105 active:scale-95"
                         onClick={scrollToBottom}
                         aria-label="Scroll to newest messages"
                     >
                         <ChevronDown className="size-3.5" />
-                        <span>Jump to bottom</span>
+                        <span>{streaming ? "New response below" : "Jump to latest"}</span>
                     </Button>
                 </div>
             )}

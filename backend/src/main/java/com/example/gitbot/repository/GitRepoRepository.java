@@ -15,4 +15,6 @@ public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
     Optional<GitRepo> findByIdAndUserId(UUID id, UUID userId);
 
     Optional<GitRepo> findByUserIdAndGithubRepoId(UUID userId, Long githubRepoId);
+ 
+    List<GitRepo> findByIndexStatus(com.example.gitbot.enums.IndexStatus indexStatus);
 }

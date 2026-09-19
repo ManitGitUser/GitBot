@@ -19,6 +19,7 @@ public class CodeFileFilter {
             "__pycache__",
             ".idea",
             ".vscode",
+            ".gradle",
             "coverage",
             "out"
     );
@@ -42,7 +43,9 @@ public class CodeFileFilter {
             "pnpm-lock.yaml",
             "composer.lock",
             "cargo.lock",
-            "poetry.lock"
+            "poetry.lock",
+            "bun.lockb",
+            "go.sum"
     );
 
     public boolean isEligible(String path, long sizeBytes, long maxFileBytes) {

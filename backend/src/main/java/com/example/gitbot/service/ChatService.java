@@ -101,6 +101,9 @@ public class ChatService {
             throw new BadRequestException("Repository is not ready for chat");
         }
 
+        // Cancel any existing active stream and persist interrupted state before reading history
+        chatStreamHandler.stopStream(sessionId);
+
         // 1. Fetch prior conversation history before persisting the current question
         List<ChatMessage> priorMessages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
 
@@ -137,6 +140,9 @@ public class ChatService {
         if (repo.getIndexStatus() != IndexStatus.READY) {
             throw new BadRequestException("Repository is not ready for chat");
         }
+
+        // Cancel any existing active stream and persist interrupted state before reading messages
+        chatStreamHandler.stopStream(sessionId);
 
         List<ChatMessage> allMessages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
 
@@ -250,6 +256,7 @@ public class ChatService {
                     .status(m.getStatus())
                     .content(m.getContent())
                     .citations(m.getCitations())
+                    .createdAt(m.getCreatedAt())
                     .build());
         }
 

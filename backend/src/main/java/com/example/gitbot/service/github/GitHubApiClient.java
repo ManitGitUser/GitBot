@@ -64,9 +64,10 @@ public class GitHubApiClient {
     }
 
     public String getFileContent(String accessToken, String owner, String repo, String path) {
+        String cleanPath = path != null && path.startsWith("/") ? path.substring(1) : (path != null ? path : "");
         Map<String, Object> body = client(accessToken)
                 .get()
-                .uri("/repos/{owner}/{repo}/contents/{path}", owner, repo, path)
+                .uri("/repos/{owner}/{repo}/contents/" + cleanPath, owner, repo)
                 .retrieve()
                 .body(MAP);
         if (body == null) {

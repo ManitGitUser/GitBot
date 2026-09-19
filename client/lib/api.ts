@@ -62,6 +62,7 @@ export type Citation = {
     startLine: number | null;
     endLine: number | null;
     language: string | null;
+    repoFullName?: string | null;
 };
 
 export type ChatMessage = {

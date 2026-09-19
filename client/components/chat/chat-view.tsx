@@ -105,7 +105,7 @@ export function ChatView({ repoId }: { repoId: string }) {
     const sessionId = activeSession?.id ?? null;
 
     const messagesQuery = useChatMessages(sessionId);
-    const { send, retry, stop, streaming, streamText } = useStreamChat(sessionId);
+    const { send, retry, stop, streaming, streamText, retryingMessageId } = useStreamChat(sessionId);
 
     // Share Modal State
     const [shareOpen, setShareOpen] = useState(false);
@@ -323,6 +323,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                                 repo={repo}
                                 messages={messagesQuery.data ?? []}
                                 streamText={streamText}
+                                retryingMessageId={retryingMessageId}
                                 isLoading={messagesQuery.isLoading}
                                 streaming={streaming}
                                 onRetry={(msgId) => retry(msgId)}

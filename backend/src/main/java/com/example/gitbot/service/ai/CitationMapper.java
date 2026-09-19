@@ -42,7 +42,8 @@ public class CitationMapper {
                 stringVal(meta.get("filePath")),
                 intVal(meta.get("startLine")),
                 intVal(meta.get("endLine")),
-                stringVal(meta.get("language"))
+                stringVal(meta.get("language")),
+                stringVal(meta.get("repoFullName"))
         );
     }
 

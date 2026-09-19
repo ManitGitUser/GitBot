@@ -194,6 +194,7 @@ export function useStreamChat(sessionId: string | null) {
     const queryClient = useQueryClient();
     const [streaming, setStreaming] = useState(false);
     const [streamText, setStreamText] = useState("");
+    const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
     const abortRef = useRef<AbortController | null>(null);
 
     const send = useCallback(
@@ -220,6 +221,7 @@ export function useStreamChat(sessionId: string | null) {
             );
 
             setStreaming(true);
+            setRetryingMessageId(null);
             setStreamText("");
 
             try {
@@ -263,6 +265,7 @@ export function useStreamChat(sessionId: string | null) {
                     },
                 });
             } catch (err) {
+                setStreamText("");
                 if ((err as Error).name === "AbortError") return;
                 toast.add({
                     title: "Message failed",
@@ -272,7 +275,6 @@ export function useStreamChat(sessionId: string | null) {
                 void queryClient.invalidateQueries({
                     queryKey: queryKeys.chat.messages(sessionId),
                 });
-                setStreamText("");
             } finally {
                 setStreaming(false);
             }
@@ -289,6 +291,7 @@ export function useStreamChat(sessionId: string | null) {
             abortRef.current = controller;
 
             setStreaming(true);
+            setRetryingMessageId(messageId);
             setStreamText("");
 
             try {
@@ -310,6 +313,7 @@ export function useStreamChat(sessionId: string | null) {
                             }
                         );
                         setStreamText("");
+                        setRetryingMessageId(null);
                     },
                     onError: (err) => {
                         toast.add({
@@ -323,6 +327,7 @@ export function useStreamChat(sessionId: string | null) {
                     },
                 });
             } catch (err) {
+                setStreamText("");
                 if ((err as Error).name === "AbortError") return;
                 toast.add({
                     title: "Retry failed",
@@ -332,9 +337,9 @@ export function useStreamChat(sessionId: string | null) {
                 void queryClient.invalidateQueries({
                     queryKey: queryKeys.chat.messages(sessionId),
                 });
-                setStreamText("");
             } finally {
                 setStreaming(false);
+                setRetryingMessageId(null);
             }
         },
         [sessionId, streaming, queryClient]
@@ -342,11 +347,19 @@ export function useStreamChat(sessionId: string | null) {
 
     const stop = useCallback(() => {
         abortRef.current?.abort();
-        if (sessionId) {
-            void api.stopStream(sessionId).catch(() => {});
-        }
         setStreaming(false);
-    }, [sessionId]);
+        setStreamText("");
+        setRetryingMessageId(null);
+        if (sessionId) {
+            void api.stopStream(sessionId)
+                .catch(() => {})
+                .finally(() => {
+                    void queryClient.invalidateQueries({
+                        queryKey: queryKeys.chat.messages(sessionId),
+                    });
+                });
+        }
+    }, [sessionId, queryClient]);
 
-    return { send, retry, stop, streaming, streamText };
+    return { send, retry, stop, streaming, streamText, retryingMessageId };
 }

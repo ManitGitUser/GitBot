@@ -32,20 +32,23 @@ public class ChatPromptBuilder {
 
     public String systemPrompt(String repositoryFullName) {
         return """
-                You are GitBot, an expert assistant for the %s codebase.
-                Answer using ONLY the provided code context.
-                If the context is insufficient, say you are unsure.
-                Cite file paths and line ranges when relevant.
-                Be concise and technical.
-                """.formatted(repositoryFullName);
+                You are GitBot, an expert technical assistant for the %s codebase.
+                Use the provided repository code context to answer the user's questions accurately.
+                The code context contains authentic source chunks from the repository, delimited by <source> blocks with exact file paths and line ranges.
+                Cite relevant file paths and line ranges when referencing code.
+                If the provided context is insufficient to answer the question, clearly state that rather than fabricating code or assumptions.
+                Do not invent files, APIs, functions, or line numbers not grounded in the context.
+                Be concise, precise, and technical.
+                """
+                .formatted(repositoryFullName);
     }
 
     public String userPrompt(String codeContext, String question) {
         return """
-                Code context:
+                Repository Code Context:
                 %s
 
-                User question:
+                User Question:
                 %s
                 """.formatted(codeContext, question);
     }

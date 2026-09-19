@@ -176,6 +176,7 @@ export function ChatMessages({
     repo,
     messages,
     streamText,
+    retryingMessageId,
     isLoading,
     streaming,
     onRetry,
@@ -186,6 +187,7 @@ export function ChatMessages({
     repo: Repository;
     messages: ChatMessage[];
     streamText?: string;
+    retryingMessageId?: string | null;
     isLoading?: boolean;
     streaming?: boolean;
     onRetry?: (messageId: string) => void;
@@ -283,8 +285,9 @@ export function ChatMessages({
                     <MessageGroup>
                         {messages.map((message) => {
                             const isUser = message.role === "USER";
-                            const isInterrupted = message.status === "INTERRUPTED";
-                            const isFailed = message.status === "FAILED";
+                            const isRetryingThis = !isUser && message.id === retryingMessageId;
+                            const isInterrupted = message.status === "INTERRUPTED" && !isRetryingThis;
+                            const isFailed = message.status === "FAILED" && !isRetryingThis;
 
                             return (
                                 <Message
@@ -318,6 +321,11 @@ export function ChatMessages({
                                             <BubbleContent className={cn(!isUser && "w-full max-w-full px-4 py-3")}>
                                                 {isUser ? (
                                                     <span className="whitespace-pre-wrap">{message.content}</span>
+                                                ) : isRetryingThis ? (
+                                                    <>
+                                                        <ChatMarkdown content={streamText || "Regenerating response..."} isStreaming />
+                                                        <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <ChatMarkdown content={message.content} />
@@ -366,13 +374,13 @@ export function ChatMessages({
                                             </BubbleContent>
                                         </Bubble>
 
-                                        {!isUser && message.citations?.length > 0 && (
+                                        {!isUser && message.citations?.length > 0 && !isRetryingThis && (
                                             <MessageFooter>
                                                 <CitationChips repo={repo} citations={message.citations} />
                                             </MessageFooter>
                                         )}
 
-                                        {!isUser && (
+                                        {!isUser && !isRetryingThis && (
                                             <AssistantMessageToolbar
                                                 message={message}
                                                 streaming={streaming}
@@ -387,7 +395,7 @@ export function ChatMessages({
                             );
                         })}
 
-                        {streamText && (
+                        {streamText && !retryingMessageId && (
                             <Message align="start">
                                 <MessageAvatar>
                                     <Avatar className="size-8">

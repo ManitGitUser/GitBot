@@ -28,9 +28,11 @@ public class IndexingProgressService {
             String error
     ) {
         gitRepoRepository.findById(repoId).ifPresent(repo -> {
-            repo.setFilesTotal(total);
-            repo.setFilesProcessed(processed);
-            repo.setChunkCount(chunks);
+            int validTotal = Math.max(0, total);
+            int validProcessed = Math.max(0, Math.min(processed, validTotal));
+            repo.setFilesTotal(validTotal);
+            repo.setFilesProcessed(validProcessed);
+            repo.setChunkCount(Math.max(0, chunks));
             repo.setIndexStatus(status);
             repo.setErrorMessage(error);
             gitRepoRepository.save(repo);
@@ -40,10 +42,12 @@ public class IndexingProgressService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName) {
         gitRepoRepository.findById(repoId).ifPresent(repo -> {
+            int validTotal = Math.max(0, totalFiles);
+            int validProcessed = Math.max(0, Math.min(processedFiles, validTotal));
             repo.setIndexStatus(IndexStatus.READY);
-            repo.setFilesTotal(totalFiles);
-            repo.setFilesProcessed(processedFiles);
-            repo.setChunkCount(totalChunks);
+            repo.setFilesTotal(validTotal);
+            repo.setFilesProcessed(validProcessed);
+            repo.setChunkCount(Math.max(0, totalChunks));
             repo.setIndexedAt(Instant.now());
             repo.setErrorMessage(null);
             gitRepoRepository.save(repo);

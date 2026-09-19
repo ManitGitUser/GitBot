@@ -83,5 +83,10 @@ app:
     max-file-bytes: 102400
     chunk-size: 800
     chunk-overlap: 100
+  rag:
+    top-k: 10
+    max-context-chars: 12000
+    enable-neighboring: true
+    max-neighboring-chunks: 4
   github:
     api-delay-ms: 50

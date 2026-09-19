@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Citation, Repository } from "@/lib/api";
 
 export function citationHref(repo: Repository, citation: Citation) {
+    const fullName = citation.repoFullName || repo.fullName;
     const line =
         citation.startLine != null
             ? `#L${citation.startLine}${
@@ -14,7 +15,7 @@ export function citationHref(repo: Repository, citation: Citation) {
                     : ""
             }`
             : "";
-    return `https://github.com/${repo.fullName}/blob/${repo.defaultBranch}/${citation.filePath}${line}`;
+    return `https://github.com/${fullName}/blob/${repo.defaultBranch}/${citation.filePath}${line}`;
 }
 
 export function CitationChips({

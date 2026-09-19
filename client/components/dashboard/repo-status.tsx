@@ -17,11 +17,28 @@ export function indexStatusLabel(status: IndexStatus) {
 
 export function IndexStatusBadge({
                                      status,
+                                     hasNewCommit = false,
                                      className,
                                  }: {
     status: IndexStatus;
+    hasNewCommit?: boolean;
     className?: string;
 }) {
+    if (hasNewCommit && status === "READY") {
+        return (
+            <Badge
+                variant="outline"
+                className={cn(
+                    "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium",
+                    className
+                )}
+            >
+                <span className="mr-1.5 size-1.5 rounded-full bg-amber-500" />
+                New commit available
+            </Badge>
+        );
+    }
+
     const variant =
         status === "READY"
             ? "default"

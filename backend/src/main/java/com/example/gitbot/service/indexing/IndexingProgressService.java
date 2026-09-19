@@ -40,7 +40,7 @@ public class IndexingProgressService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName) {
+    public void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName, String commitSha) {
         gitRepoRepository.findById(repoId).ifPresent(repo -> {
             int validTotal = Math.max(0, totalFiles);
             int validProcessed = Math.max(0, Math.min(processedFiles, validTotal));
@@ -49,10 +49,21 @@ public class IndexingProgressService {
             repo.setFilesProcessed(validProcessed);
             repo.setChunkCount(Math.max(0, totalChunks));
             repo.setIndexedAt(Instant.now());
+            if (commitSha != null && !commitSha.isBlank()) {
+                repo.setIndexedCommitSha(commitSha);
+                if (repo.getLatestCommitSha() == null) {
+                    repo.setLatestCommitSha(commitSha);
+                }
+            }
             repo.setErrorMessage(null);
             gitRepoRepository.save(repo);
         });
-        log.info("Indexed {} files ({} chunks) for {}", processedFiles, totalChunks, fullName);
+        log.info("Indexed {} files ({} chunks) for {} at commit {}", processedFiles, totalChunks, fullName, commitSha);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName) {
+        markReady(repoId, totalFiles, processedFiles, totalChunks, fullName, null);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

@@ -1,57 +1,118 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
+type AvatarContextValue = {
+  imageLoaded: boolean;
+  setImageLoaded: (loaded: boolean) => void;
+};
+
+const AvatarContext = React.createContext<AvatarContextValue>({
+  imageLoaded: false,
+  setImageLoaded: () => {},
+});
 
 function Avatar({
   className,
   size = "default",
+  children,
   ...props
-}: AvatarPrimitive.Root.Props & {
-  size?: "default" | "sm" | "lg"
+}: React.ComponentProps<"span"> & {
+  size?: "default" | "sm" | "lg";
 }) {
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+
   return (
-    <AvatarPrimitive.Root
-      data-slot="avatar"
-      data-size={size}
-      className={cn(
-        "group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
-        className
-      )}
-      {...props}
-    />
-  )
+    <AvatarContext.Provider value={{ imageLoaded, setImageLoaded }}>
+      <span
+        data-slot="avatar"
+        data-size={size}
+        className={cn(
+          "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </span>
+    </AvatarContext.Provider>
+  );
 }
 
-function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+function AvatarImage({
+  className,
+  src,
+  alt,
+  referrerPolicy = "no-referrer",
+  onLoad,
+  onError,
+  ...props
+}: React.ComponentProps<"img">) {
+  const { setImageLoaded } = React.useContext(AvatarContext);
+  const [hasError, setHasError] = React.useState(false);
+  const [prevSrc, setPrevSrc] = React.useState(src);
+
+  if (prevSrc !== src) {
+    setPrevSrc(src);
+    setHasError(false);
+    if (!src) {
+      setImageLoaded(false);
+    }
+  }
+
+  if (!src || hasError) {
+    return null;
+  }
+
   return (
-    <AvatarPrimitive.Image
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
       data-slot="avatar-image"
+      src={src}
+      alt={alt || ""}
+      referrerPolicy={referrerPolicy}
+      onLoad={(e) => {
+        setImageLoaded(true);
+        onLoad?.(e);
+      }}
+      onError={(e) => {
+        setHasError(true);
+        setImageLoaded(false);
+        onError?.(e);
+      }}
       className={cn(
         "aspect-square size-full rounded-full object-cover",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
 function AvatarFallback({
   className,
+  children,
   ...props
-}: AvatarPrimitive.Fallback.Props) {
+}: React.ComponentProps<"span">) {
+  const { imageLoaded } = React.useContext(AvatarContext);
+
+  if (imageLoaded) {
+    return null;
+  }
+
   return (
-    <AvatarPrimitive.Fallback
+    <span
       data-slot="avatar-fallback"
       className={cn(
         "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
         className
       )}
       {...props}
-    />
-  )
+    >
+      {children}
+    </span>
+  );
 }
 
 function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
@@ -67,7 +128,7 @@ function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
       )}
       {...props}
     />
-  )
+  );
 }
 
 function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
@@ -80,7 +141,7 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
       )}
       {...props}
     />
-  )
+  );
 }
 
 function AvatarGroupCount({
@@ -96,7 +157,7 @@ function AvatarGroupCount({
       )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -106,4 +167,4 @@ export {
   AvatarGroup,
   AvatarGroupCount,
   AvatarBadge,
-}
+};

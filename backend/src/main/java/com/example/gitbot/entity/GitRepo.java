@@ -62,6 +62,12 @@ public class GitRepo {
     @Column(name = "indexed_at")
     private Instant indexedAt;
 
+    @Column(name = "indexed_commit_sha", length = 100)
+    private String indexedCommitSha;
+
+    @Column(name = "latest_commit_sha", length = 100)
+    private String latestCommitSha;
+
     @Column(name = "chunk_count", nullable = false)
     @Builder.Default
     private int chunkCount = 0;

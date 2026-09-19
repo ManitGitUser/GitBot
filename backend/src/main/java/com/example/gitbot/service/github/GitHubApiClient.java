@@ -55,6 +55,18 @@ public class GitHubApiClient {
         return all;
     }
 
+    public String getLatestCommitSha(String accessToken, String owner, String repo, String branch) {
+        Map<String, Object> body = client(accessToken)
+                .get()
+                .uri("/repos/{owner}/{repo}/commits/{ref}", owner, repo, branch)
+                .retrieve()
+                .body(MAP);
+        if (body == null || body.get("sha") == null) {
+            throw new IllegalStateException("Failed to retrieve latest commit SHA for " + owner + "/" + repo);
+        }
+        return String.valueOf(body.get("sha"));
+    }
+
     public Map<String, Object> getRepoTree(String accessToken, String owner, String repo, String branch) {
         return client(accessToken)
                 .get()
@@ -63,11 +75,17 @@ public class GitHubApiClient {
                 .body(MAP);
     }
 
-    public String getFileContent(String accessToken, String owner, String repo, String path) {
+    public String getFileContent(String accessToken, String owner, String repo, String path, String ref) {
         String cleanPath = path != null && path.startsWith("/") ? path.substring(1) : (path != null ? path : "");
         Map<String, Object> body = client(accessToken)
                 .get()
-                .uri("/repos/{owner}/{repo}/contents/" + cleanPath, owner, repo)
+                .uri(uriBuilder -> {
+                    var builder = uriBuilder.path("/repos/{owner}/{repo}/contents/" + cleanPath);
+                    if (ref != null && !ref.isBlank()) {
+                        builder.queryParam("ref", ref);
+                    }
+                    return builder.build(owner, repo);
+                })
                 .retrieve()
                 .body(MAP);
         if (body == null) {
@@ -83,6 +101,18 @@ public class GitHubApiClient {
             return new String(Base64.getDecoder().decode(raw), StandardCharsets.UTF_8);
         }
         return String.valueOf(content);
+    }
+
+    public String getFileContent(String accessToken, String owner, String repo, String path) {
+        return getFileContent(accessToken, owner, repo, path, null);
+    }
+
+    public Map<String, Object> getCurrentUserProfile(String accessToken) {
+        return client(accessToken)
+                .get()
+                .uri("/user")
+                .retrieve()
+                .body(MAP);
     }
 
     private RestClient client(String accessToken) {

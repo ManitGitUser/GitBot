@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { LogOut, Moon, RefreshCw, Sun, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { GitHubIcon } from "@/components/icons/github-icon";
@@ -18,11 +18,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { useCurrentUser, useLogout } from "@/hooks/use-auth";
+import { useCurrentUser, useLogout, useSyncProfile } from "@/hooks/use-auth";
 
 export function SettingsDashboard() {
     const { data: user } = useCurrentUser();
     const logout = useLogout();
+    const syncProfile = useSyncProfile();
     const { theme, setTheme, resolvedTheme } = useTheme();
     const isDark = resolvedTheme === "dark";
 
@@ -126,6 +127,15 @@ export function SettingsDashboard() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3 sm:flex-row">
+                    <Button
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => syncProfile.mutate()}
+                        disabled={syncProfile.isPending}
+                    >
+                        <RefreshCw className={syncProfile.isPending ? "animate-spin" : ""} data-icon="inline-start" />
+                        {syncProfile.isPending ? "Syncing Profile…" : "Sync Profile"}
+                    </Button>
                     <Button variant="outline" className="justify-start" disabled>
                         <UserRound data-icon="inline-start" />
                         Manage on GitHub

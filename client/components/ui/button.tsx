@@ -42,12 +42,24 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  // If render is passed and is not a native button, default nativeButton to false to avoid Base UI warning
+  const resolvedNativeButton =
+    nativeButton ??
+    (props.render &&
+    typeof props.render === "object" &&
+    "type" in props.render &&
+    props.render.type !== "button"
+      ? false
+      : undefined)
+
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      nativeButton={resolvedNativeButton}
       {...props}
     />
   )

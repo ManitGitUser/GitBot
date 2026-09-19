@@ -86,31 +86,71 @@ export function useStartIndexing() {
     });
 }
 
-export function useRefreshRepos() {
+
+export function useSyncRepo() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: () =>
-            toast.promise(api.listRepos(true), {
-                loading: {
-                    title: "Syncing repositories",
-                    description: "Fetching the latest repos from GitHub…",
+        mutationFn: (repoId: string) => api.syncRepo(repoId),
+        onSuccess: (data) => {
+            void queryClient.invalidateQueries({
+                queryKey: queryKeys.repos.all,
+            });
+            if (data.reindexTriggered) {
+                toast.add({
+                    title: "Syncing repository",
+                    description: data.message || "New commit detected. Re-indexing…",
                     type: "loading",
-                },
-                success: (repos) => ({
-                    title: "Sync successful",
-                    description: `${repos.length} repositories loaded`,
+                });
+            } else {
+                toast.add({
+                    title: "Repository up to date",
+                    description: data.message || "No new commits found.",
                     type: "success",
-                }),
-                error: (error: Error) => ({
-                    title: "Sync failed",
-                    description:
-                        error instanceof Error ? error.message : "Could not sync repositories",
-                    type: "error",
-                }),
-            }),
-        onSuccess: (repos) => {
-            queryClient.setQueryData(queryKeys.repos.list(), repos);
+                });
+            }
+        },
+        onError: (error: Error) => {
+            toast.add({
+                title: "Unable to sync repository",
+                description: error.message,
+                type: "error",
+            });
+        },
+    });
+}
+
+export function useSyncAllRepos() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => api.syncAllRepos(),
+        onSuccess: (data) => {
+            void queryClient.invalidateQueries({
+                queryKey: queryKeys.repos.all,
+            });
+            const details: string[] = [];
+            if (data.newRepositories > 0) {
+                details.push(`${data.newRepositories} new`);
+            }
+            if (data.repositoriesWithNewCommits > 0) {
+                details.push(`${data.repositoriesWithNewCommits} with new commits`);
+            }
+            const desc = details.length > 0
+                ? `Repositories synced — ${details.join(", ")}.`
+                : "All repositories are up to date.";
+            toast.add({
+                title: "Sync completed",
+                description: desc,
+                type: "success",
+            });
+        },
+        onError: (error: Error) => {
+            toast.add({
+                title: "Unable to sync repositories",
+                description: error.message,
+                type: "error",
+            });
         },
     });
 }

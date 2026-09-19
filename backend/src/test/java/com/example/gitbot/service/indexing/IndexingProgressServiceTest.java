@@ -92,4 +92,76 @@ class IndexingProgressServiceTest {
 
         verify(gitRepoRepository).save(repo);
     }
+
+    @Test
+    void markReady_preservesNewerLatestCommitSha_whenIndexingFinishes() {
+        UUID repoId = UUID.randomUUID();
+        // State: latestCommitSha = D (discovered while indexing C), indexedCommitSha = A
+        GitRepo repo = GitRepo.builder()
+                .id(repoId)
+                .indexStatus(IndexStatus.INDEXING)
+                .indexedCommitSha("sha-A")
+                .latestCommitSha("sha-D")
+                .build();
+
+        when(gitRepoRepository.findById(repoId)).thenReturn(Optional.of(repo));
+        when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Indexing C finishes successfully
+        progressService.markReady(repoId, 10, 10, 20, "owner/repo", "sha-C");
+
+        // After successful indexing: latestCommitSha == D, indexedCommitSha == C
+        assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("sha-C");
+        assertThat(repo.getLatestCommitSha()).isEqualTo("sha-D");
+
+        verify(gitRepoRepository).save(repo);
+    }
+
+    @Test
+    void markReady_updatesIndexedCommitSha_andPreservesMatchingLatestCommitSha() {
+        UUID repoId = UUID.randomUUID();
+        // State: latestCommitSha = C, indexedCommitSha = A
+        GitRepo repo = GitRepo.builder()
+                .id(repoId)
+                .indexStatus(IndexStatus.INDEXING)
+                .indexedCommitSha("sha-A")
+                .latestCommitSha("sha-C")
+                .build();
+
+        when(gitRepoRepository.findById(repoId)).thenReturn(Optional.of(repo));
+        when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Indexing C finishes successfully
+        progressService.markReady(repoId, 10, 10, 20, "owner/repo", "sha-C");
+
+        // After successful indexing: latestCommitSha == C, indexedCommitSha == C
+        assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("sha-C");
+        assertThat(repo.getLatestCommitSha()).isEqualTo("sha-C");
+
+        verify(gitRepoRepository).save(repo);
+    }
+
+    @Test
+    void markReady_initializesLatestCommitSha_whenNull() {
+        UUID repoId = UUID.randomUUID();
+        GitRepo repo = GitRepo.builder()
+                .id(repoId)
+                .indexStatus(IndexStatus.INDEXING)
+                .indexedCommitSha(null)
+                .latestCommitSha(null)
+                .build();
+
+        when(gitRepoRepository.findById(repoId)).thenReturn(Optional.of(repo));
+        when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        progressService.markReady(repoId, 10, 10, 20, "owner/repo", "sha-C");
+
+        assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("sha-C");
+        assertThat(repo.getLatestCommitSha()).isEqualTo("sha-C");
+
+        verify(gitRepoRepository).save(repo);
+    }
 }

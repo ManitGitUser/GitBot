@@ -9,7 +9,7 @@ import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
     Message,
     MessageAvatar,
@@ -124,7 +124,7 @@ export default function SharedChatPage({
                 <p className="max-w-md text-sm text-muted-foreground">
                     This shared conversation does not exist, has expired, or was revoked by its author.
                 </p>
-                <Button render={<Link href="/" />}>Go to GitBot</Button>
+                <Link href="/" className={buttonVariants()}>Go to GitBot</Link>
             </div>
         );
     }
@@ -145,9 +145,12 @@ export default function SharedChatPage({
                         <Globe className="size-3" />
                         Read-Only View
                     </Badge>
-                    <Button size="sm" variant="outline" render={<Link href="/login" />}>
+                    <Link
+                        href="/login"
+                        className={buttonVariants({ size: "sm", variant: "outline" })}
+                    >
                         Sign in
-                    </Button>
+                    </Link>
                 </div>
             </header>
 

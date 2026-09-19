@@ -2,6 +2,7 @@ package com.example.gitbot.service;
 
 import com.example.gitbot.entity.User;
 import com.example.gitbot.repository.UserRepository;
+import com.example.gitbot.service.github.GitHubApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class UserService {
 
     private final UserRepository userRepo;
     private final TextEncryptor tokenEncryptor;
+    private final GitHubApiClient gitHubApiClient;
 
     public Optional<User> getByGithubId(Long id) {
         return userRepo.findByGithubId(id);
@@ -59,5 +61,27 @@ public class UserService {
         user.setTokenScopes(scopes);
 
         return userRepo.save(user);
+    }
+
+    @Transactional
+    public User syncProfile(UUID userId) {
+        User user = getById(userId);
+        String token = decryptAccessToken(user);
+        Map<String, Object> profile = gitHubApiClient.getCurrentUserProfile(token);
+        if (profile != null) {
+            if (profile.get("login") != null) {
+                user.setGithubUsername(String.valueOf(profile.get("login")));
+            }
+            if (profile.get("name") != null && !String.valueOf(profile.get("name")).isBlank()) {
+                user.setDisplayName(String.valueOf(profile.get("name")));
+            } else if (user.getDisplayName() == null || user.getDisplayName().isBlank()) {
+                user.setDisplayName(user.getGithubUsername());
+            }
+            if (profile.get("avatar_url") != null) {
+                user.setAvatarUrl(String.valueOf(profile.get("avatar_url")));
+            }
+            user = userRepo.save(user);
+        }
+        return user;
     }
 }

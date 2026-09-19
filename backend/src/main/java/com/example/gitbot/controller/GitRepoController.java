@@ -2,6 +2,8 @@ package com.example.gitbot.controller;
 
 import com.example.gitbot.dto.GitRepoResponse;
 import com.example.gitbot.dto.IndexStatusResponse;
+import com.example.gitbot.dto.SyncAllReposResponse;
+import com.example.gitbot.dto.SyncRepoResponse;
 import com.example.gitbot.entity.GitRepo;
 import com.example.gitbot.security.CurrentUser;
 import com.example.gitbot.service.GitRepoService;
@@ -52,5 +54,19 @@ public class GitRepoController {
         GitRepo repo = indexingService.startIndexing(id, userId);
         indexingService.indexAsync(id, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(gitRepoService.toResponse(repo));
+    }
+
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<SyncRepoResponse> sync(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        SyncRepoResponse response = gitRepoService.syncRepo(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/sync-all")
+    public ResponseEntity<SyncAllReposResponse> syncAll() {
+        UUID userId = currentUser.require().getId();
+        SyncAllReposResponse response = gitRepoService.syncAllRepos(userId);
+        return ResponseEntity.ok(response);
     }
 }

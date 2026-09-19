@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings, Sparkles } from "lucide-react";
+import { LogOut, RefreshCw, Settings, Sparkles } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { FeatureTutorial, ONBOARDING_STORAGE_KEY } from "@/components/onboarding/feature-tutorial";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { useCurrentUser, useLogout } from "@/hooks/use-auth";
+import { useCurrentUser, useLogout, useSyncProfile } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -60,6 +60,7 @@ export function AppShell({
     const router = useRouter();
     const { data: user, isLoading: isAuthLoading } = useCurrentUser();
     const logout = useLogout();
+    const syncProfile = useSyncProfile();
     const [tutorialOpen, setTutorialOpen] = useState(false);
 
     useEffect(() => {
@@ -156,10 +157,12 @@ export function AppShell({
                                     }
                                 >
                                     <Avatar className="size-8 rounded-lg">
-                                        <AvatarImage
-                                            src={user?.avatarUrl ?? undefined}
-                                            alt={user?.displayName}
-                                        />
+                                        {user?.avatarUrl && (
+                                            <AvatarImage
+                                                src={user.avatarUrl}
+                                                alt={user?.displayName || "User"}
+                                            />
+                                        )}
                                         <AvatarFallback className="rounded-lg">
                                             {(user?.displayName ?? "DP").slice(0, 2).toUpperCase()}
                                         </AvatarFallback>
@@ -192,6 +195,13 @@ export function AppShell({
                                         </DropdownMenuLabel>
                                     </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => syncProfile.mutate()}
+                                        disabled={syncProfile.isPending}
+                                    >
+                                        <RefreshCw className={syncProfile.isPending ? "animate-spin" : ""} />
+                                        {syncProfile.isPending ? "Syncing Profile…" : "Sync Profile"}
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setTutorialOpen(true)}>
                                         <Sparkles />
                                         Feature Tutorial
@@ -272,8 +282,11 @@ export function GhostButtonLink({
     className?: string;
 }) {
     return (
-        <Button variant="ghost" size="sm" className={className} render={<Link href={href} />}>
+        <Link
+            href={href}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), className)}
+        >
             {children}
-        </Button>
+        </Link>
     );
 }

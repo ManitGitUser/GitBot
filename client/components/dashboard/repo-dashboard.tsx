@@ -14,14 +14,14 @@ import {
     EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRefreshRepos, useRepos } from "@/hooks/use-repos";
+import { useRepos, useSyncAllRepos } from "@/hooks/use-repos";
 import type { IndexStatus } from "@/lib/api";
 
 type FilterStatus = "ALL" | IndexStatus;
 
 export function RepoDashboard() {
     const reposQuery = useRepos();
-    const refresh = useRefreshRepos();
+    const syncAllMutation = useSyncAllRepos();
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<FilterStatus>("ALL");
     const [visibility, setVisibility] = useState<"all" | "public" | "private">(
@@ -59,8 +59,8 @@ export function RepoDashboard() {
                 onStatusChange={setStatus}
                 totalCount={reposQuery.data?.length}
                 readyCount={readyCount}
-                onSync={() => refresh.mutate()}
-                isSyncing={refresh.isPending || reposQuery.isFetching}
+                onSyncAll={() => syncAllMutation.mutate()}
+                isSyncingAll={syncAllMutation.isPending}
             />
 
             <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">

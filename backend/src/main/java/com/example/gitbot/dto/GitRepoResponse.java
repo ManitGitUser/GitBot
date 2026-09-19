@@ -22,6 +22,8 @@ public record GitRepoResponse(
         int chunkCount,
         int filesTotal,
         int filesProcessed,
-        String errorMessage
+        String errorMessage,
+        String indexedCommitSha,
+        String latestCommitSha
 ) {
 }

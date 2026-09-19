@@ -12,6 +12,8 @@ public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
 
     List<GitRepo> findByUserIdOrderByFullNameAsc(UUID userId);
 
+    List<GitRepo> findByUserId(UUID userId);
+
     Optional<GitRepo> findByIdAndUserId(UUID id, UUID userId);
 
     Optional<GitRepo> findByUserIdAndGithubRepoId(UUID userId, Long githubRepoId);

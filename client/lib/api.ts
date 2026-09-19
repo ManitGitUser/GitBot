@@ -25,6 +25,24 @@ export type Repository = {
     filesTotal: number;
     filesProcessed: number;
     errorMessage: string | null;
+    indexedCommitSha: string | null;
+    latestCommitSha: string | null;
+};
+
+export type SyncAllReposResponse = {
+    totalRepositories: number;
+    newRepositories: number;
+    updatedRepositories: number;
+    unchangedRepositories: number;
+    repositoriesWithNewCommits: number;
+};
+
+export type SyncRepoResponse = {
+    repoId: string;
+    reindexTriggered: boolean;
+    message: string;
+    currentCommitSha: string;
+    indexedCommitSha: string | null;
 };
 
 export type IndexStatusResponse = {
@@ -183,7 +201,22 @@ export async function apiFetch<T>(
 
 export const api = {
     csrf: () => apiFetch<{ token: string; headerName: string; parameterName: string }>("/api/auth/csrf"),
-    me: () => apiFetch<User>("/api/auth/me"),
+    me: async () => {
+        const raw = await apiFetch<User & { avatar_url?: string }>("/api/auth/me");
+        return {
+            ...raw,
+            avatarUrl: raw.avatarUrl || raw.avatar_url || null,
+        };
+    },
+    syncProfile: async () => {
+        const raw = await apiFetch<User & { avatar_url?: string }>("/api/auth/sync-profile", {
+            method: "POST",
+        });
+        return {
+            ...raw,
+            avatarUrl: raw.avatarUrl || raw.avatar_url || null,
+        };
+    },
     logout: () =>
         apiFetch<void>("/api/auth/logout", {
             method: "POST",
@@ -192,8 +225,12 @@ export const api = {
     listRepos: (refresh = true) =>
         apiFetch<Repository[]>(`/api/repos?refresh=${refresh}`),
     getRepo: (id: string) => apiFetch<Repository>(`/api/repos/${id}`),
+    syncAllRepos: () =>
+        apiFetch<SyncAllReposResponse>("/api/repos/sync-all", { method: "POST" }),
     startIndex: (id: string) =>
         apiFetch<Repository>(`/api/repos/${id}/index`, { method: "POST" }),
+    syncRepo: (id: string) =>
+        apiFetch<SyncRepoResponse>(`/api/repos/${id}/sync`, { method: "POST" }),
     indexStatus: (id: string) =>
         apiFetch<IndexStatusResponse>(`/api/repos/${id}/status`),
     createSession: (repositoryId: string, title?: string) =>

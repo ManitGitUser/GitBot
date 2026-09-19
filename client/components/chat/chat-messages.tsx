@@ -173,6 +173,50 @@ function AssistantMessageToolbar({
     );
 }
 
+function UserMessageToolbar({ message }: { message: ChatMessage }) {
+    const [copied, setCopied] = useState(false);
+
+    async function handleCopy() {
+        const success = await copyToClipboard(message.content);
+        if (success) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+            toast.add({
+                title: "Prompt copied to clipboard",
+                type: "success",
+            });
+        } else {
+            toast.add({
+                title: "Failed to copy",
+                description: "Clipboard access was denied.",
+                type: "error",
+            });
+        }
+    }
+
+    return (
+        <div
+            className={cn(
+                "mt-1 flex min-h-7 flex-wrap items-center justify-end gap-1 text-muted-foreground",
+                "opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+            )}
+            role="toolbar"
+            aria-label="User message actions"
+        >
+            <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={handleCopy}
+                aria-label={copied ? "Copied prompt to clipboard" : "Copy prompt"}
+            >
+                {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
+            </Button>
+        </div>
+    );
+}
+
 export function ChatMessages({
     repo,
     messages,
@@ -379,6 +423,10 @@ export function ChatMessages({
                                                 )}
                                             </BubbleContent>
                                         </Bubble>
+
+                                        {isUser && (
+                                            <UserMessageToolbar message={message} />
+                                        )}
 
                                         {!isUser && message.citations?.length > 0 && !isRetryingThis && (
                                             <MessageFooter>

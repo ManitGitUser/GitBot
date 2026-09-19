@@ -21,7 +21,7 @@ import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { IndexingState } from "@/components/chat/indexing-state";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -338,7 +338,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                     <p className="text-sm text-muted-foreground">
                         {(repoQuery.error as Error)?.message ?? "Repository not found"}
                     </p>
-                    <Button render={<Link href="/dashboard" />}>Back to dashboard</Button>
+                    <Link href="/dashboard" className={buttonVariants()}>Back to dashboard</Link>
                 </div>
             </AppShell>
         );
@@ -368,10 +368,13 @@ export function ChatView({ repoId }: { repoId: string }) {
                             <span>{activeSession?.isShared ? "Shared" : "Share"}</span>
                         </Button>
                     )}
-                    <Button variant="outline" size="sm" render={<Link href="/dashboard" />}>
+                    <Link
+                        href="/dashboard"
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
                         <ArrowLeft data-icon="inline-start" />
                         Repos
-                    </Button>
+                    </Link>
                 </div>
             }
         >

@@ -8,6 +8,7 @@ import com.example.gitbot.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -29,7 +30,20 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me() {
         AppUserPrincipal principal = currUser.require();
-        User user = principal.getUser();
+        User user = userServ.getById(principal.getId());
+        return ResponseEntity.ok(new UserResponse(
+                user.getId(),
+                user.getGithubId(),
+                user.getGithubUsername(),
+                user.getDisplayName(),
+                user.getAvatarUrl()
+        ));
+    }
+
+    @PostMapping("/sync-profile")
+    public ResponseEntity<UserResponse> syncProfile() {
+        AppUserPrincipal principal = currUser.require();
+        User user = userServ.syncProfile(principal.getId());
         return ResponseEntity.ok(new UserResponse(
                 user.getId(),
                 user.getGithubId(),

@@ -100,8 +100,20 @@ public class IndexingService {
                 .orElseThrow(() -> new NotFoundException("Repository not found"));
         String token = userService.decryptAccessToken(userService.getById(userId));
 
+        String commitSha = repo.getLatestCommitSha();
+        if (commitSha == null || commitSha.isBlank()) {
+            try {
+                commitSha = gitHubApiClient.getLatestCommitSha(
+                        token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
+            } catch (Exception ex) {
+                log.warn("Could not fetch latest commit SHA for repo {}, falling back to branch name {}: {}",
+                        repo.getFullName(), repo.getDefaultBranch(), ex.getMessage());
+            }
+        }
+
+        String treeRef = commitSha != null ? commitSha : repo.getDefaultBranch();
         Map<String, Object> tree = gitHubApiClient.getRepoTree(
-                token, repo.getOwner(), repo.getName(), repo.getDefaultBranch());
+                token, repo.getOwner(), repo.getName(), treeRef);
 
         if (Boolean.TRUE.equals(tree.get("truncated"))) {
             log.warn("GitHub tree response was truncated for repository {}. Some files may not be indexed.",
@@ -112,7 +124,7 @@ public class IndexingService {
 
         if (filePaths.isEmpty()) {
             deleteExistingVectors(repoId.toString());
-            progressService.markReady(repoId, 0, 0, 0, repo.getFullName());
+            progressService.markReady(repoId, 0, 0, 0, repo.getFullName(), commitSha);
             return;
         }
 
@@ -126,7 +138,7 @@ public class IndexingService {
         for (String path : filePaths) {
             try {
                 String content = gitHubApiClient.getFileContent(
-                        token, repo.getOwner(), repo.getName(), path);
+                        token, repo.getOwner(), repo.getName(), path, treeRef);
                 if (content != null && !content.isBlank()) {
                     List<Document> chunks = codeChunker.chunkFile(
                             repoId.toString(), repo.getFullName(), path, content, runId);
@@ -176,7 +188,7 @@ public class IndexingService {
         // Success: atomically clean up any old vectors from previous runs
         deleteVectorsExceptRun(repoId.toString(), runId);
 
-        progressService.markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName());
+        progressService.markReady(repoId, filePaths.size(), processed, totalChunks, repo.getFullName(), commitSha);
     }
 
     @EventListener(ApplicationReadyEvent.class)

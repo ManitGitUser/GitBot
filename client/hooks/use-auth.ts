@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { toast } from "@/components/ui/toast";
 
 export const AUTH_COOKIE = "gitbot_auth";
 
@@ -49,6 +50,29 @@ export function useLogout() {
             queryClient.setQueryData(queryKeys.auth.me(), null);
             await queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
             router.replace("/login");
+        },
+    });
+}
+
+export function useSyncProfile() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => api.syncProfile(),
+        onSuccess: (user) => {
+            queryClient.setQueryData(queryKeys.auth.me(), user);
+            toast.add({
+                title: "Profile synced",
+                description: "Your GitHub profile details have been refreshed.",
+                type: "success",
+            });
+        },
+        onError: (error: Error) => {
+            toast.add({
+                title: "Unable to sync profile",
+                description: error.message,
+                type: "error",
+            });
         },
     });
 }

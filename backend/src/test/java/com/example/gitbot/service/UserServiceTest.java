@@ -2,6 +2,7 @@ package com.example.gitbot.service;
 
 import com.example.gitbot.entity.User;
 import com.example.gitbot.repository.UserRepository;
+import com.example.gitbot.service.github.GitHubApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import org.springframework.security.crypto.encrypt.TextEncryptor;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,12 +29,15 @@ class UserServiceTest {
     @Mock
     private TextEncryptor tokenEncryptor;
 
+    @Mock
+    private GitHubApiClient gitHubApiClient;
+
     @InjectMocks
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        when(tokenEncryptor.encrypt(any())).thenAnswer(inv -> "enc_" + inv.getArgument(0));
+        lenient().when(tokenEncryptor.encrypt(any())).thenAnswer(inv -> "enc_" + inv.getArgument(0));
     }
 
     @Test
@@ -73,5 +78,37 @@ class UserServiceTest {
 
         assertThat(user.getDisplayName()).isEqualTo("monalisa");
         assertThat(user.getAvatarUrl()).isEqualTo("https://github.com/images/error/octocat_happy.gif");
+    }
+
+    @Test
+    void syncProfile_updatesDisplayNameAvatarAndUsername() {
+        UUID userId = UUID.randomUUID();
+        User existing = User.builder()
+                .id(userId)
+                .githubId(12345L)
+                .githubUsername("old-login")
+                .displayName("Old Name")
+                .avatarUrl("https://old.avatar/pic.png")
+                .accessToken("enc_token")
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
+        when(tokenEncryptor.decrypt("enc_token")).thenReturn("raw_token");
+
+        Map<String, Object> gitHubProfile = new HashMap<>();
+        gitHubProfile.put("login", "new-login");
+        gitHubProfile.put("name", "New Name");
+        gitHubProfile.put("avatar_url", "https://new.avatar/pic.png");
+
+        when(gitHubApiClient.getCurrentUserProfile("raw_token")).thenReturn(gitHubProfile);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User updated = userService.syncProfile(userId);
+
+        assertThat(updated.getGithubUsername()).isEqualTo("new-login");
+        assertThat(updated.getDisplayName()).isEqualTo("New Name");
+        assertThat(updated.getAvatarUrl()).isEqualTo("https://new.avatar/pic.png");
+
+        verify(userRepository).save(existing);
     }
 }

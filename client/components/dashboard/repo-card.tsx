@@ -7,6 +7,7 @@ import {
     GitBranch,
     Lock,
     MessageSquare,
+    RefreshCw,
     RotateCcw,
     Sparkles,
 } from "lucide-react";
@@ -15,17 +16,23 @@ import { IndexErrorAlert } from "@/components/dashboard/index-error-alert";
 import { LanguageBadge } from "@/components/dashboard/language-badge";
 import { IndexStatusBadge } from "@/components/dashboard/repo-status";
 import { LanguageIcon } from "@/components/icons/language-icon";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { getRepoProgress, useStartIndexing } from "@/hooks/use-repos";
+import { getRepoProgress, useStartIndexing, useSyncRepo } from "@/hooks/use-repos";
 import type { Repository } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function RepoCard({ repo }: { repo: Repository }) {
     const router = useRouter();
     const indexMutation = useStartIndexing();
-    const isIndexing = repo.indexStatus === "INDEXING" || indexMutation.isPending;
+    const syncMutation = useSyncRepo();
+    const hasNewCommit = Boolean(
+        repo.latestCommitSha &&
+        repo.indexedCommitSha &&
+        repo.latestCommitSha !== repo.indexedCommitSha
+    );
+    const isIndexing = repo.indexStatus === "INDEXING" || indexMutation.isPending || syncMutation.isPending;
     const isFailed = repo.indexStatus === "FAILED";
     const progress = getRepoProgress(repo);
 
@@ -61,7 +68,7 @@ export function RepoCard({ repo }: { repo: Repository }) {
                             <h3 className="truncate font-medium">{repo.name}</h3>
                         </div>
                     </div>
-                    <IndexStatusBadge status={repo.indexStatus} />
+                    <IndexStatusBadge status={repo.indexStatus} hasNewCommit={hasNewCommit} />
                 </div>
             </div>
 
@@ -110,6 +117,13 @@ export function RepoCard({ repo }: { repo: Repository }) {
                     )}
                 </div>
 
+                {hasNewCommit && !isIndexing && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs text-amber-600 dark:text-amber-400">
+                        <GitBranch className="size-3.5 shrink-0" />
+                        <span className="truncate">New commit available ({repo.latestCommitSha?.slice(0, 7)})</span>
+                    </div>
+                )}
+
                 {isIndexing && (
                     <div className="space-y-2 rounded-xl border border-dashed bg-muted/30 p-3">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -129,54 +143,96 @@ export function RepoCard({ repo }: { repo: Repository }) {
 
             <div className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-border/70 p-4">
                 {repo.htmlUrl ? (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        render={<a href={repo.htmlUrl} target="_blank" rel="noreferrer" />}
+                    <a
+                        href={repo.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn(
+                            buttonVariants({ variant: "ghost", size: "sm" }),
+                            "gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        )}
                     >
-                        <ExternalLink data-icon="inline-start" />
+                        <ExternalLink className="size-3.5" />
                         GitHub
-                    </Button>
+                    </a>
                 ) : (
                     <span />
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    {repo.indexStatus === "READY" && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isIndexing}
+                            onClick={() => syncMutation.mutate(repo.id)}
+                            title="Sync repository with latest GitHub commits"
+                        >
+                            {syncMutation.isPending ? (
+                                <Spinner data-icon="inline-start" />
+                            ) : (
+                                <RefreshCw data-icon="inline-start" />
+                            )}
+                            {syncMutation.isPending ? "Syncing…" : "Sync"}
+                        </Button>
+                    )}
                     {repo.indexStatus === "READY" && (
                         <Button variant="secondary" size="sm" onClick={openChat}>
                             <MessageSquare data-icon="inline-start" />
                             Chat
                         </Button>
                     )}
-                    <Button
-                        size="sm"
-                        variant={isFailed ? "outline" : "default"}
-                        className={cn(isFailed && "border-destructive/30 text-destructive hover:bg-destructive/10")}
-                        disabled={isIndexing}
-                        onClick={handlePrimary}
-                    >
-                        {isIndexing ? (
-                            <>
-                                <Spinner data-icon="inline-start" />
-                                Indexing
-                            </>
-                        ) : repo.indexStatus === "READY" ? (
-                            <>
-                                Open
-                                <ArrowRight data-icon="inline-end" />
-                            </>
-                        ) : isFailed ? (
-                            <>
-                                <RotateCcw data-icon="inline-start" />
-                                Retry
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles data-icon="inline-start" />
-                                Index
-                            </>
-                        )}
-                    </Button>
+                    {hasNewCommit && repo.indexStatus === "READY" ? (
+                        <Button
+                            size="sm"
+                            variant="default"
+                            disabled={isIndexing}
+                            onClick={() => indexMutation.mutate(repo.id)}
+                            title="Index the new commit from GitHub"
+                        >
+                            {isIndexing ? (
+                                <>
+                                    <Spinner data-icon="inline-start" />
+                                    Indexing
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles data-icon="inline-start" />
+                                    Index
+                                </>
+                            )}
+                        </Button>
+                    ) : (
+                        <Button
+                            size="sm"
+                            variant={isFailed ? "outline" : "default"}
+                            className={cn(isFailed && "border-destructive/30 text-destructive hover:bg-destructive/10")}
+                            disabled={isIndexing}
+                            onClick={handlePrimary}
+                        >
+                            {isIndexing ? (
+                                <>
+                                    <Spinner data-icon="inline-start" />
+                                    Indexing
+                                </>
+                            ) : repo.indexStatus === "READY" ? (
+                                <>
+                                    Open
+                                    <ArrowRight data-icon="inline-end" />
+                                </>
+                            ) : isFailed ? (
+                                <>
+                                    <RotateCcw data-icon="inline-start" />
+                                    Retry
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles data-icon="inline-start" />
+                                    Index
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </div>
         </article>

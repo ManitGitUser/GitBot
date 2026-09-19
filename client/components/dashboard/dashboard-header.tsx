@@ -21,8 +21,8 @@ type DashboardHeaderProps = {
     onStatusChange: (value: FilterStatus) => void;
     totalCount?: number;
     readyCount?: number;
-    onSync: () => void;
-    isSyncing?: boolean;
+    onSyncAll?: () => void;
+    isSyncingAll?: boolean;
 };
 
 const visibilityFilters = [
@@ -73,8 +73,8 @@ export function DashboardHeader({
                                     onStatusChange,
                                     totalCount,
                                     readyCount,
-                                    onSync,
-                                    isSyncing,
+                                    onSyncAll,
+                                    isSyncingAll,
                                 }: DashboardHeaderProps) {
     return (
         <div className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">
@@ -105,18 +105,19 @@ export function DashboardHeader({
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                className="border-dashed shadow-sm"
-                                onClick={onSync}
-                                disabled={isSyncing}
-                            >
-                                <RefreshCw
-                                    data-icon="inline-start"
-                                    className={isSyncing ? "animate-spin" : undefined}
-                                />
-                                Sync
-                            </Button>
+                            {onSyncAll && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isSyncingAll}
+                                    onClick={onSyncAll}
+                                    title="Sync all repositories"
+                                    className="gap-1.5 text-xs font-medium"
+                                >
+                                    <RefreshCw className={cn("size-3.5", isSyncingAll && "animate-spin")} />
+                                    {isSyncingAll ? "Syncing…" : "Sync All"}
+                                </Button>
+                            )}
                             <ModeToggle />
                         </div>
                     </div>

@@ -96,9 +96,9 @@ class IndexingServiceTest {
                 .thenReturn(createTree(files));
         when(codeFileFilter.isEligible(anyString(), anyLong(), anyLong())).thenReturn(true);
 
-        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Main.java")))
+        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Main.java"), any()))
                 .thenReturn("public class Main {}");
-        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Util.java")))
+        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Util.java"), any()))
                 .thenReturn("public class Util {}");
 
         Document doc1 = new Document("Main chunk", Map.of("chunkIndex", 0));
@@ -117,7 +117,7 @@ class IndexingServiceTest {
         verify(vectorStore, atLeastOnce()).delete(any(Filter.Expression.class));
 
         // Progress marked ready with consistent counts
-        verify(progressService).markReady(repoId, 2, 2, 2, "octocat/Hello-World");
+        verify(progressService).markReady(eq(repoId), eq(2), eq(2), eq(2), eq("octocat/Hello-World"), any());
         verify(progressService, never()).markFailed(any(), any());
     }
 
@@ -133,7 +133,7 @@ class IndexingServiceTest {
         when(codeFileFilter.isEligible(anyString(), anyLong(), anyLong())).thenReturn(true);
 
         // GitHub API throws 401 Unauthorized fatal exception
-        when(gitHubApiClient.getFileContent(anyString(), anyString(), anyString(), anyString()))
+        when(gitHubApiClient.getFileContent(anyString(), anyString(), anyString(), anyString(), any()))
                 .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized", HttpHeaders.EMPTY, null, null));
 
         indexingService.indexAsync(repoId, userId);
@@ -158,10 +158,10 @@ class IndexingServiceTest {
         when(codeFileFilter.isEligible(anyString(), anyLong(), anyLong())).thenReturn(true);
 
         // First file throws non-fatal 404
-        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Bad.java")))
+        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Bad.java"), any()))
                 .thenThrow(HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", HttpHeaders.EMPTY, null, null));
         // Second file succeeds
-        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Good.java")))
+        when(gitHubApiClient.getFileContent(eq("raw_token"), eq("octocat"), eq("Hello-World"), eq("src/Good.java"), any()))
                 .thenReturn("public class Good {}");
 
         Document doc = new Document("Good chunk", Map.of("chunkIndex", 0));
@@ -174,7 +174,7 @@ class IndexingServiceTest {
         verify(vectorStore).add(anyList());
 
         // Successfully marked ready because 1 file succeeded
-        verify(progressService).markReady(repoId, 2, 2, 1, "octocat/Hello-World");
+        verify(progressService).markReady(eq(repoId), eq(2), eq(2), eq(1), eq("octocat/Hello-World"), any());
         verify(progressService, never()).markFailed(any(), any());
     }
 
@@ -189,7 +189,7 @@ class IndexingServiceTest {
                 .thenReturn(createTree(files));
         when(codeFileFilter.isEligible(anyString(), anyLong(), anyLong())).thenReturn(true);
 
-        when(gitHubApiClient.getFileContent(anyString(), anyString(), anyString(), anyString()))
+        when(gitHubApiClient.getFileContent(anyString(), anyString(), anyString(), anyString(), any()))
                 .thenReturn("content");
         when(codeChunker.chunkFile(anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(List.of(new Document("c", Map.of())));
@@ -216,7 +216,7 @@ class IndexingServiceTest {
             assertThat(processedList.get(i)).isGreaterThanOrEqualTo(0);
         }
 
-        verify(progressService).markReady(repoId, 3, 3, 3, "octocat/Hello-World");
+        verify(progressService).markReady(eq(repoId), eq(3), eq(3), eq(3), eq("octocat/Hello-World"), any());
     }
 
     @Test

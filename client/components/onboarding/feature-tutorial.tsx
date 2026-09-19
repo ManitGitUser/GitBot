@@ -200,20 +200,12 @@ export function FeatureTutorial({
                 showCloseButton={true}
             >
                 {/* Header Banner */}
-                <div className="relative border-b bg-muted/40 px-6 pt-6 pb-5">
+                <div className="relative border-b bg-muted/40 px-6 pt-6 pb-5 pr-12">
                     <div className="flex items-center justify-between gap-3 mb-3">
                         <Badge variant="secondary" className="text-xs font-medium">
                             <Sparkles className="mr-1 size-3 text-primary" />
                             Feature Guide &bull; {currentSlide + 1} of {slides.length}
                         </Badge>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={handleComplete}
-                        >
-                            Skip tutorial
-                        </Button>
                     </div>
 
                     <div className="flex items-start gap-4">
@@ -301,7 +293,7 @@ export function FeatureTutorial({
                             onClick={handleNext}
                             className="h-8 gap-1 text-xs"
                         >
-                            <span>{isLastSlide ? "Get Started" : "Next"}</span>
+                            <span>{isLastSlide ? "Start Exploring" : "Next"}</span>
                             {!isLastSlide && <ChevronRight className="size-3.5" />}
                         </Button>
                     </div>

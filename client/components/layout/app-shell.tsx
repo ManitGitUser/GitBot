@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, RefreshCw, Settings, Sparkles } from "lucide-react";
+import { LogOut, MessageSquare, RefreshCw, Settings, Sparkles } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { FeatureTutorial, ONBOARDING_STORAGE_KEY } from "@/components/onboarding/feature-tutorial";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useCurrentUser, useLogout, useSyncProfile } from "@/hooks/use-auth";
+import { useRecentChatSessions } from "@/hooks/use-chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -49,16 +50,23 @@ export function AppShell({
                              description,
                              actions,
                              hideHeader = false,
+                             className,
+                             contentClassName,
+                             activeSessionId,
                          }: {
     children: React.ReactNode;
     title?: string;
     description?: string;
     actions?: React.ReactNode;
     hideHeader?: boolean;
+    className?: string;
+    contentClassName?: string;
+    activeSessionId?: string | null;
 }) {
     const pathname = usePathname();
     const router = useRouter();
     const { data: user, isLoading: isAuthLoading } = useCurrentUser();
+    const { data: recentSessions } = useRecentChatSessions(10);
     const logout = useLogout();
     const syncProfile = useSyncProfile();
     const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -86,9 +94,10 @@ export function AppShell({
                                 size="lg"
                                 render={<Link href="/dashboard" />}
                                 tooltip="GitBot"
+                                className="group-data-[collapsible=icon]:justify-center"
                             >
-                                <GitBotIcon className="size-8 rounded-[10px]" />
-                                <div className="grid flex-1 text-left text-sm leading-tight">
+                                <GitBotIcon className="size-8 shrink-0 rounded-[10px]" />
+                                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                                     <span className="truncate font-semibold">GitBot</span>
                                     <span className="truncate text-xs text-muted-foreground">
                     Chat with your code
@@ -101,29 +110,68 @@ export function AppShell({
 
                 <SidebarContent>
                     {dashboardNavGroups.map((group) => (
-                        <SidebarGroup key={group.label}>
-                            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    {group.items.map((item) => (
-                                        <SidebarMenuItem key={item.href}>
-                                            <SidebarMenuButton
-                                                isActive={isDashboardNavActive(
-                                                    pathname,
-                                                    item.href,
-                                                    item.exact
-                                                )}
-                                                tooltip={item.title}
-                                                render={<Link href={item.href} />}
-                                            >
-                                                <item.icon />
-                                                <span>{item.title}</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    ))}
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
+                        <div key={group.label} className="contents">
+                            <SidebarGroup>
+                                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {group.items.map((item) => (
+                                            <SidebarMenuItem key={item.href}>
+                                                <SidebarMenuButton
+                                                    isActive={isDashboardNavActive(
+                                                        pathname,
+                                                        item.href,
+                                                        item.exact
+                                                    )}
+                                                    tooltip={item.title}
+                                                    render={<Link href={item.href} />}
+                                                >
+                                                    <item.icon />
+                                                    <span>{item.title}</span>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        ))}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+
+                            {group.label === "Workspace" && (
+                                <SidebarGroup>
+                                    <SidebarGroupLabel>Recent chats</SidebarGroupLabel>
+                                    <SidebarGroupContent>
+                                        <SidebarMenu>
+                                            {recentSessions && recentSessions.length > 0 ? (
+                                                recentSessions.slice(0, 10).map((session) => {
+                                                    const isChatActive =
+                                                        pathname.startsWith("/chat/") &&
+                                                        activeSessionId === session.id;
+                                                    return (
+                                                        <SidebarMenuItem key={session.id}>
+                                                            <SidebarMenuButton
+                                                                isActive={isChatActive}
+                                                                tooltip={session.title || "New chat"}
+                                                                render={
+                                                                    <Link
+                                                                        href={`/chat/${session.repositoryId}?sessionId=${session.id}`}
+                                                                    />
+                                                                }
+                                                            >
+                                                                <MessageSquare />
+                                                                <span>{session.title || "New chat"}</span>
+                                                            </SidebarMenuButton>
+                                                        </SidebarMenuItem>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="px-3 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                                                    No recent chats
+                                                </div>
+                                            )}
+                                        </SidebarMenu>
+                                    </SidebarGroupContent>
+                                </SidebarGroup>
+                            )}
+                        </div>
                     ))}
 
                     <SidebarGroup>
@@ -167,7 +215,7 @@ export function AppShell({
                                             {(user?.displayName ?? "DP").slice(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="grid flex-1 text-left text-sm leading-tight">
+                                    <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-medium">
                       {user?.displayName}
                     </span>
@@ -184,14 +232,14 @@ export function AppShell({
                                 >
                                     <DropdownMenuGroup>
                                         <DropdownMenuLabel className="font-normal">
-                                            <div className="flex flex-col gap-1">
+                                             <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium">
                           {user?.displayName}
                         </span>
                                                 <span className="text-xs text-muted-foreground">
                           Connected via GitHub
                         </span>
-                                            </div>
+                                             </div>
                                         </DropdownMenuLabel>
                                     </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
@@ -225,7 +273,7 @@ export function AppShell({
                 </SidebarFooter>
             </Sidebar>
 
-            <SidebarInset>
+            <SidebarInset className={cn("min-w-0 md:h-[calc(100svh-1rem)] md:max-h-[calc(100svh-1rem)]", className)}>
                 {!hideHeader && (
                     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
                         <SidebarTrigger className="-ml-1" />
@@ -250,7 +298,9 @@ export function AppShell({
                         </div>
                     </header>
                 )}
-                <div className="flex flex-1 flex-col">{children}</div>
+                <div className={cn("flex flex-1 flex-col min-h-0 min-w-0", contentClassName ?? "overflow-y-auto")}>
+                    {children}
+                </div>
             </SidebarInset>
 
             <FeatureTutorial open={tutorialOpen} onOpenChange={setTutorialOpen} />

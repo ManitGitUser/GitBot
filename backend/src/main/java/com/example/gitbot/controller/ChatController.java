@@ -55,6 +55,14 @@ public class ChatController {
         return chatService.listSessions(userId, repositoryId, org.springframework.data.domain.PageRequest.of(page, size));
     }
 
+    @GetMapping("/sessions/recent")
+    public List<ChatSessionResponse> listRecentSessions(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        UUID userId = currentUser.require().getId();
+        return chatService.listRecentSessions(userId, limit);
+    }
+
     @GetMapping("/sessions/{id}")
     public com.example.gitbot.dto.PagedMessagesResponse getMessages(
             @PathVariable UUID id,

@@ -21,11 +21,12 @@ export function ChatMarkdown({
 }) {
     return (
         <Streamdown
-            className={cn("chat-markdown max-w-none text-sm leading-relaxed", className)}
+            className={cn("chat-markdown max-w-none text-sm leading-relaxed [word-break:break-word]", className)}
             mode={isStreaming ? "streaming" : "static"}
             plugins={streamdownPlugins}
             shikiTheme={["github-light", "github-dark"]}
-            isAnimating={false}
+            isAnimating={isStreaming}
+            caret={isStreaming ? "block" : undefined}
         >
             {content}
         </Streamdown>

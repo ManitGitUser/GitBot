@@ -135,7 +135,7 @@ export function ChatSidebar({
                 className
             )}
         >
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 p-4 shrink-0">
                 <div className="space-y-1">
                     <p className="truncate text-sm font-medium">{repo.fullName}</p>
                     <div className="flex flex-wrap items-center gap-2">
@@ -177,11 +177,11 @@ export function ChatSidebar({
                 </div>
             </div>
 
-            <Separator />
+            <Separator className="shrink-0" />
 
             {/* Optional search if sessions > 5 */}
             {showSearch && (
-                <div className="p-2 pb-0">
+                <div className="p-2 pb-0 shrink-0">
                     <div className="relative flex items-center">
                         <Search className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" />
                         <Input
@@ -205,7 +205,7 @@ export function ChatSidebar({
                 </div>
             )}
 
-            <div className="flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground">
+            <div className="flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground shrink-0">
                 <span>Conversations</span>
                 {allSessions.length > 0 && (
                     <span className="text-[10px] text-muted-foreground/80">
@@ -214,7 +214,7 @@ export function ChatSidebar({
                 )}
             </div>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
                 <div className="space-y-1 px-2 pb-4" role="navigation" aria-label="Chat sessions">
                     {!ready && (
                         <p className="px-2 py-4 text-xs text-center text-muted-foreground">

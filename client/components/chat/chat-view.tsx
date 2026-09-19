@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertCircle,
@@ -78,6 +79,10 @@ const REPORT_REASONS: { value: ReportReason; label: string; desc: string }[] = [
 ];
 
 export function ChatView({ repoId }: { repoId: string }) {
+    const searchParams = useSearchParams();
+    const isOpenMode = searchParams.get("mode") === "open";
+    const paramSessionId = searchParams.get("sessionId");
+
     const repoQuery = useRepository(repoId);
     const isIndexing = repoQuery.data?.indexStatus === "INDEXING";
     const statusQuery = useIndexStatus(
@@ -95,18 +100,30 @@ export function ChatView({ repoId }: { repoId: string }) {
     const revokeShare = useRevokeChatSession();
     const reportMessage = useReportMessage();
 
-    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+    const [prevParamSessionId, setPrevParamSessionId] = useState(paramSessionId);
+    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(paramSessionId);
     const autoCreateRef = useRef(false);
+
+    if (paramSessionId !== prevParamSessionId) {
+        setPrevParamSessionId(paramSessionId);
+        setSelectedSessionId(paramSessionId);
+    }
 
     const allSessions = useMemo(
         () => sessionsQuery.data?.pages.flatMap((p) => p.content) ?? [],
         [sessionsQuery.data]
     );
     const activeSession =
-        allSessions.find((s: ChatSession) => s.id === (selectedSessionId ?? allSessions[0]?.id)) ??
-        allSessions[0] ??
-        null;
-    const sessionId = activeSession?.id ?? null;
+        allSessions.find(
+            (s: ChatSession) =>
+                s.id ===
+                (selectedSessionId ??
+                    (isOpenMode ? undefined : allSessions[0]?.id))
+        ) ??
+        (isOpenMode && selectedSessionId === null
+            ? null
+            : allSessions[0] ?? null);
+    const sessionId = activeSession?.id ?? selectedSessionId ?? null;
 
     const messagesQuery = useChatMessages(sessionId);
     const { send, retry, stop, streaming, streamText, retryingMessageId } = useStreamChat(sessionId);
@@ -208,6 +225,7 @@ export function ChatView({ repoId }: { repoId: string }) {
 
     useEffect(() => {
         if (!ready || sessionsQuery.isLoading) return;
+        if (isOpenMode && selectedSessionId === null) return;
         if (allSessions.length > 0) return;
         if (
             !sessionsQuery.isSuccess ||
@@ -226,6 +244,8 @@ export function ChatView({ repoId }: { repoId: string }) {
         });
     }, [
         ready,
+        isOpenMode,
+        selectedSessionId,
         sessionsQuery.isLoading,
         sessionsQuery.isSuccess,
         allSessions.length,
@@ -353,6 +373,8 @@ export function ChatView({ repoId }: { repoId: string }) {
     return (
         <AppShell
             title={repo.fullName}
+            activeSessionId={sessionId}
+            contentClassName="overflow-hidden"
             description={
                 ready
                     ? "Ask questions grounded in this repository"
@@ -382,14 +404,14 @@ export function ChatView({ repoId }: { repoId: string }) {
                 </div>
             }
         >
-            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row md:h-full md:overflow-hidden">
                 <ChatSidebar
                     style={
                         {
                             "--chat-sidebar-width": `${sidebarWidth}px`,
                         } as React.CSSProperties
                     }
-                    className="md:w-[var(--chat-sidebar-width)]"
+                    className="md:w-[var(--chat-sidebar-width)] md:h-full md:min-h-0 md:overflow-hidden flex flex-col"
                     repo={{
                         ...repo,
                         indexStatus: indexStatus ?? repo.indexStatus,
@@ -419,7 +441,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                     onPointerDown={handlePointerDown}
                     onKeyDown={handleKeyDown}
                     className={cn(
-                        "relative hidden md:flex w-1.5 -ml-1 cursor-col-resize select-none items-center justify-center transition-colors group z-10",
+                        "relative hidden md:flex w-1.5 -ml-1 cursor-col-resize select-none items-center justify-center transition-colors group z-10 shrink-0",
                         "hover:bg-primary/20 active:bg-primary/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                         isDragging && "bg-primary/40"
                     )}
@@ -427,7 +449,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                     <div className="h-8 w-0.5 rounded-full bg-muted-foreground/30 group-hover:bg-primary/60 transition-colors" />
                 </div>
 
-                <section className="flex min-h-[70vh] min-w-0 flex-1 flex-col">
+                <section className="flex min-h-0 min-w-0 flex-1 flex-col md:h-full md:overflow-hidden">
                     {!ready ? (
                         <IndexingState repo={repo} status={statusQuery.data} />
                     ) : (
@@ -446,9 +468,20 @@ export function ChatView({ repoId }: { repoId: string }) {
                                 onBranch={handleStartBranch}
                                 onReport={handleStartReport}
                                 onShare={() => setShareOpen(true)}
+                                hasActiveSession={Boolean(sessionId)}
+                                onNewChat={() =>
+                                    createSession.mutate("New chat", {
+                                        onSuccess: (session) => setSelectedSessionId(session.id),
+                                    })
+                                }
                             />
                             <ChatComposer
                                 disabled={!sessionId}
+                                placeholder={
+                                    !sessionId
+                                        ? "Select a conversation or start a new chat to begin…"
+                                        : undefined
+                                }
                                 streaming={streaming}
                                 onSend={send}
                                 onStop={stop}
@@ -630,7 +663,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                                 {reportError && (
                                     <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive flex items-center gap-2">
                                         <AlertCircle className="size-4 shrink-0" />
-                                        <span>{reportError}</span>
+                                        <span data-slot="report-error-message">{reportError}</span>
                                     </div>
                                 )}
 

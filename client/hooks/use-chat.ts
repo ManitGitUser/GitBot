@@ -23,6 +23,14 @@ export function useChatSessions(repositoryId: string, enabled = true) {
     });
 }
 
+export function useRecentChatSessions(limit = 10) {
+    return useQuery({
+        queryKey: queryKeys.chat.recentSessions(limit),
+        queryFn: () => api.listRecentSessions(limit),
+        staleTime: 30_000,
+    });
+}
+
 export function useChatMessages(sessionId: string | null) {
     const queryClient = useQueryClient();
     const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
@@ -82,6 +90,9 @@ export function useCreateChatSession(repositoryId: string) {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.sessions(repositoryId),
             });
+            void queryClient.invalidateQueries({
+                queryKey: [...queryKeys.chat.all, "recent-sessions"],
+            });
             queryClient.setQueryData<PagedMessagesResponse>(queryKeys.chat.messages(session.id), {
                 messages: [],
                 hasMore: false,
@@ -106,6 +117,9 @@ export function useDeleteChatSession(repositoryId: string) {
         onSuccess: (_, sessionId) => {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.sessions(repositoryId),
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [...queryKeys.chat.all, "recent-sessions"],
             });
             queryClient.removeQueries({
                 queryKey: queryKeys.chat.messages(sessionId),
@@ -134,6 +148,9 @@ export function useRenameChatSession(repositoryId: string) {
         onSuccess: () => {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.sessions(repositoryId),
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [...queryKeys.chat.all, "recent-sessions"],
             });
             toast.add({
                 title: "Chat renamed",
@@ -166,6 +183,9 @@ export function useBranchChatSession(repositoryId: string) {
         onSuccess: (branch) => {
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.sessions(repositoryId),
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [...queryKeys.chat.all, "recent-sessions"],
             });
             toast.add({
                 title: "Branch created",
@@ -314,6 +334,9 @@ export function useStreamChat(sessionId: string | null) {
                                 };
                             }
                         );
+                        void queryClient.invalidateQueries({
+                            queryKey: [...queryKeys.chat.all, "recent-sessions"],
+                        });
                         setStreamText("");
                     },
                     onError: (err) => {

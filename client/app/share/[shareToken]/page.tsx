@@ -195,12 +195,12 @@ export default function SharedChatPage({
                                     </MessageAvatar>
                                     <MessageContent>
                                         <Bubble
-                                            variant={isUser ? "default" : "muted"}
+                                            variant={isUser ? "default" : "ghost"}
                                             align={isUser ? "end" : "start"}
-                                            className={cn(!isUser && "max-w-full")}
+                                            className={cn(!isUser && "max-w-full bg-transparent border-none shadow-none")}
                                         >
                                             <BubbleContent
-                                                className={cn(!isUser && "w-full max-w-full px-4 py-3")}
+                                                className={cn(!isUser && "w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground")}
                                             >
                                                 {isUser ? (
                                                     <span className="whitespace-pre-wrap">

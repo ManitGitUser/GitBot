@@ -13,6 +13,8 @@ export const queryKeys = {
         all: ["chat"] as const,
         sessions: (repositoryId: string, page = 0, size = 10) =>
             [...queryKeys.chat.all, "sessions", repositoryId, { page, size }] as const,
+        recentSessions: (limit = 10) =>
+            [...queryKeys.chat.all, "recent-sessions", { limit }] as const,
         messages: (sessionId: string) =>
             [...queryKeys.chat.all, "messages", sessionId] as const,
     },

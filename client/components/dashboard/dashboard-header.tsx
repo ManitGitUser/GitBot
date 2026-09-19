@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, Search } from "lucide-react";
+import { LayoutGrid, List, RefreshCw, Search } from "lucide-react";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ type DashboardHeaderProps = {
     readyCount?: number;
     onSyncAll?: () => void;
     isSyncingAll?: boolean;
+    viewMode?: "list" | "grid";
+    onViewModeChange?: (mode: "list" | "grid") => void;
 };
 
 const visibilityFilters = [
@@ -75,6 +77,8 @@ export function DashboardHeader({
                                     readyCount,
                                     onSyncAll,
                                     isSyncingAll,
+                                    viewMode = "list",
+                                    onViewModeChange,
                                 }: DashboardHeaderProps) {
     return (
         <div className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">
@@ -105,6 +109,42 @@ export function DashboardHeader({
                             />
                         </div>
                         <div className="flex items-center gap-2">
+                            {onViewModeChange && (
+                                <div className="flex items-center rounded-lg border border-border/70 p-0.5 bg-muted/40" role="group" aria-label="Repository view switcher">
+                                    <button
+                                        type="button"
+                                        onClick={() => onViewModeChange("list")}
+                                        className={cn(
+                                            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                                            viewMode === "list"
+                                                ? "bg-background text-foreground shadow-xs"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        title="List view"
+                                        aria-label="List view"
+                                        aria-pressed={viewMode === "list"}
+                                    >
+                                        <List className="size-3.5" />
+                                        <span className="hidden sm:inline">List</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => onViewModeChange("grid")}
+                                        className={cn(
+                                            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                                            viewMode === "grid"
+                                                ? "bg-background text-foreground shadow-xs"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                        title="Grid view"
+                                        aria-label="Grid view"
+                                        aria-pressed={viewMode === "grid"}
+                                    >
+                                        <LayoutGrid className="size-3.5" />
+                                        <span className="hidden sm:inline">Grid</span>
+                                    </button>
+                                </div>
+                            )}
                             {onSyncAll && (
                                 <Button
                                     variant="outline"

@@ -131,6 +131,6 @@
     cursor: pointer;
   }
   html {
-    @apply font-mono;
+    @apply font-mono bg-background text-foreground;
   }
 }

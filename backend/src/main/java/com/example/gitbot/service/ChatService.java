@@ -89,6 +89,16 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
+    public List<ChatSessionResponse> listRecentSessions(UUID userId, int limit) {
+        int validLimit = limit > 0 && limit <= 50 ? limit : 10;
+        return chatSessionRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, org.springframework.data.domain.PageRequest.of(0, validLimit))
+                .stream()
+                .map(this::toSessionResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public com.example.gitbot.dto.PagedMessagesResponse getMessages(UUID userId, UUID sessionId, String before, int limit) {
         ChatSession session = requireSession(userId, sessionId);
         int validLimit = limit > 0 ? limit : 10;

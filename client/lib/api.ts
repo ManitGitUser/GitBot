@@ -176,8 +176,12 @@ export async function getCsrfToken(): Promise<string | null> {
 
 async function parseError(res: Response): Promise<string> {
     try {
-        const data = await res.json();
-        return data.message ?? data.error ?? res.statusText;
+        const text = await res.text();
+        if (!text || !text.trim()) {
+            return res.statusText || "Request failed";
+        }
+        const data = JSON.parse(text);
+        return data.message ?? data.error ?? res.statusText ?? "Request failed";
     } catch {
         return res.statusText || "Request failed";
     }
@@ -210,11 +214,21 @@ export async function apiFetch<T>(
         throw new ApiError(res.status, await parseError(res));
     }
 
-    if (res.status === 204) {
+    if (res.status === 204 || res.status === 205) {
         return undefined as T;
     }
 
-    return res.json() as Promise<T>;
+    const contentLength = res.headers.get("content-length");
+    if (contentLength === "0") {
+        return undefined as T;
+    }
+
+    const text = await res.text();
+    if (!text || !text.trim()) {
+        return undefined as T;
+    }
+
+    return JSON.parse(text) as T;
 }
 
 export const api = {
@@ -260,6 +274,8 @@ export const api = {
         apiFetch<PageResponse<ChatSession>>(
             `/api/chat/sessions?repositoryId=${encodeURIComponent(repositoryId)}&page=${page}&size=${size}`
         ),
+    listRecentSessions: (limit = 10) =>
+        apiFetch<ChatSession[]>(`/api/chat/sessions/recent?limit=${limit}`),
     getMessages: (sessionId: string, before?: string | null, limit = 10) => {
         const params = new URLSearchParams();
         if (before) params.append("before", before);

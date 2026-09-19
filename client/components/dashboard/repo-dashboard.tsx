@@ -5,6 +5,7 @@ import { FolderGit2 } from "lucide-react";
 
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { RepoCard } from "@/components/dashboard/repo-card";
+import { RepoListItem } from "@/components/dashboard/repo-list-item";
 import { Button } from "@/components/ui/button";
 import {
     Empty,
@@ -19,6 +20,8 @@ import type { IndexStatus } from "@/lib/api";
 
 type FilterStatus = "ALL" | IndexStatus;
 
+const VIEW_MODE_STORAGE_KEY = "gitbot_repo_view_mode";
+
 export function RepoDashboard() {
     const [page, setPage] = useState(0);
     const reposQuery = useRepos(page, 10);
@@ -28,6 +31,27 @@ export function RepoDashboard() {
     const [visibility, setVisibility] = useState<"all" | "public" | "private">(
         "all"
     );
+    const [viewMode, setViewMode] = useState<"list" | "grid">(() => {
+        if (typeof window === "undefined") return "list";
+        try {
+            const saved = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+            if (saved === "grid" || saved === "list") {
+                return saved;
+            }
+        } catch {
+            // ignore
+        }
+        return "list";
+    });
+
+    const handleViewModeChange = (mode: "list" | "grid") => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+        } catch {
+            // ignore
+        }
+    };
 
     const pageData = reposQuery.data;
 
@@ -64,15 +88,29 @@ export function RepoDashboard() {
                 readyCount={readyCount}
                 onSyncAll={() => syncAllMutation.mutate()}
                 isSyncingAll={syncAllMutation.isPending}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
             />
 
             <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
                 {reposQuery.isLoading && (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <Skeleton key={i} className="h-64 rounded-2xl" />
-                        ))}
-                    </div>
+                    viewMode === "list" ? (
+                        <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="flex flex-col gap-2 p-4">
+                                    <Skeleton className="h-5 w-48 rounded" />
+                                    <Skeleton className="h-4 w-96 max-w-full rounded" />
+                                    <Skeleton className="h-3.5 w-64 rounded" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <Skeleton key={i} className="h-52 rounded-xl" />
+                            ))}
+                        </div>
+                    )
                 )}
 
                 {reposQuery.isError && (
@@ -105,11 +143,19 @@ export function RepoDashboard() {
                 )}
 
                 {reposQuery.isSuccess && filtered.length > 0 && (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {filtered.map((repo) => (
-                            <RepoCard key={repo.id} repo={repo} />
-                        ))}
-                    </div>
+                    viewMode === "list" ? (
+                        <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs">
+                            {filtered.map((repo) => (
+                                <RepoListItem key={repo.id} repo={repo} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+                            {filtered.map((repo) => (
+                                <RepoCard key={repo.id} repo={repo} />
+                            ))}
+                        </div>
+                    )
                 )}
 
                 {reposQuery.isSuccess && pageData && pageData.totalPages > 1 && (

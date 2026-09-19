@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -130,7 +131,8 @@ class ChatControllerTest {
         mockMvc.perform(post("/api/chat/sessions/{id}/messages/{messageId}/report", sessionId, messageId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(content().string(""));
 
         verify(chatService).reportMessage(userId, sessionId, messageId, ReportReason.INCORRECT, "Not accurate");
     }
@@ -141,5 +143,21 @@ class ChatControllerTest {
                 .andExpect(status().isOk());
 
         verify(chatService).stopStream(userId, sessionId);
+    }
+
+    @Test
+    void listRecentSessions_returnsList() throws Exception {
+        ChatSessionResponse response = new ChatSessionResponse(
+                sessionId, UUID.randomUUID(), "Recent Chat", Instant.now(), null, null, false, null
+        );
+        when(chatService.listRecentSessions(userId, 10)).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/api/chat/sessions/recent")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(sessionId.toString()))
+                .andExpect(jsonPath("$[0].title").value("Recent Chat"));
+
+        verify(chatService).listRecentSessions(userId, 10);
     }
 }

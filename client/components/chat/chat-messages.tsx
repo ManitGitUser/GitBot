@@ -7,6 +7,7 @@ import {
     Copy,
     Flag,
     GitFork,
+    Plus,
     RotateCcw,
     Share2,
     StopCircle,
@@ -231,6 +232,8 @@ export function ChatMessages({
     onBranch,
     onReport,
     onShare,
+    hasActiveSession = true,
+    onNewChat,
 }: {
     repo: Repository;
     messages: ChatMessage[];
@@ -245,6 +248,8 @@ export function ChatMessages({
     onBranch?: (message: ChatMessage) => void;
     onReport?: (message: ChatMessage) => void;
     onShare?: () => void;
+    hasActiveSession?: boolean;
+    onNewChat?: () => void;
 }) {
     const { data: user } = useCurrentUser();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -336,7 +341,7 @@ export function ChatMessages({
     }
 
     return (
-        <div ref={scrollContainerRef} className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={scrollContainerRef} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Live region for screen readers */}
             <div aria-live="polite" aria-atomic="true" className="sr-only">
                 {streaming
@@ -344,8 +349,8 @@ export function ChatMessages({
                     : "Response generation finished."}
             </div>
 
-            <ScrollArea className="flex-1">
-                <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6">
+            <ScrollArea className="flex-1 min-h-0 min-w-0 w-full">
+                <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 sm:px-6 py-6 transition-all">
                     {hasMore && (
                         <div className="flex justify-center pb-2">
                             <Button
@@ -360,7 +365,24 @@ export function ChatMessages({
                         </div>
                     )}
 
-                    {messages.length === 0 && !streamText && (
+                    {!hasActiveSession && (
+                        <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-10 text-center">
+                            <p className="font-medium">Repository workspace ready</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Select an existing conversation from the sidebar or start a new chat to begin.
+                            </p>
+                            {onNewChat && (
+                                <div className="mt-4 flex justify-center">
+                                    <Button size="sm" onClick={onNewChat}>
+                                        <Plus data-icon="inline-start" />
+                                        Start new chat
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {hasActiveSession && messages.length === 0 && !streamText && (
                         <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-10 text-center">
                             <p className="font-medium">Ask anything about this codebase</p>
                             <p className="mt-1 text-sm text-muted-foreground">
@@ -380,7 +402,12 @@ export function ChatMessages({
                                 <Message
                                     key={message.id}
                                     align={isUser ? "end" : "start"}
-                                    className="group/msg relative"
+                                    className={cn(
+                                        "group/msg relative",
+                                        isUser
+                                            ? "ml-auto max-w-[85%] sm:max-w-[78%] md:max-w-[72%] pr-1 sm:pr-2"
+                                            : "w-full max-w-full"
+                                    )}
                                 >
                                     <MessageAvatar>
                                         <Avatar className="size-8">
@@ -405,18 +432,25 @@ export function ChatMessages({
                                     </MessageAvatar>
                                     <MessageContent>
                                         <Bubble
-                                            variant={isUser ? "default" : "muted"}
+                                            variant={isUser ? "default" : "ghost"}
                                             align={isUser ? "end" : "start"}
-                                            className={cn(!isUser && "max-w-full")}
+                                            className={cn(
+                                                !isUser
+                                                    ? "max-w-full bg-transparent border-none shadow-none"
+                                                    : "max-w-full rounded-2xl sm:rounded-3xl"
+                                            )}
                                         >
-                                            <BubbleContent className={cn(!isUser && "w-full max-w-full px-4 py-3")}>
+                                            <BubbleContent
+                                                className={cn(
+                                                    !isUser
+                                                        ? "w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground"
+                                                        : "px-4 py-2.5"
+                                                )}
+                                            >
                                                 {isUser ? (
-                                                    <span className="whitespace-pre-wrap">{message.content}</span>
+                                                    <span className="whitespace-pre-wrap break-words">{message.content}</span>
                                                 ) : isRetryingThis ? (
-                                                    <>
-                                                        <ChatMarkdown content={streamText || "Regenerating response..."} isStreaming />
-                                                        <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
-                                                    </>
+                                                    <ChatMarkdown content={streamText || "Regenerating response..."} isStreaming />
                                                 ) : (
                                                     <>
                                                         <ChatMarkdown content={message.content} />
@@ -491,7 +525,7 @@ export function ChatMessages({
                         })}
 
                         {streamText && !retryingMessageId && (
-                            <Message align="start">
+                            <Message align="start" className="group/msg relative w-full max-w-full">
                                 <MessageAvatar>
                                     <Avatar className="size-8">
                                         <AvatarFallback className="bg-transparent p-0">
@@ -500,10 +534,9 @@ export function ChatMessages({
                                     </Avatar>
                                 </MessageAvatar>
                                 <MessageContent>
-                                    <Bubble variant="muted" align="start" className="max-w-full">
-                                        <BubbleContent className="w-full max-w-full px-4 py-3">
+                                    <Bubble variant="ghost" align="start" className="max-w-full bg-transparent border-none shadow-none">
+                                        <BubbleContent className="w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground">
                                             <ChatMarkdown content={streamText} isStreaming />
-                                            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/50 align-middle" />
                                         </BubbleContent>
                                     </Bubble>
                                 </MessageContent>

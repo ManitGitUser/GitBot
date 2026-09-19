@@ -18,7 +18,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-svh items-center justify-center">
+            <div className="flex min-h-svh items-center justify-center bg-background text-foreground">
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Spinner className="size-6" />
                     <p className="text-sm">Loading your workspace…</p>

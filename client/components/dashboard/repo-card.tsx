@@ -41,99 +41,101 @@ export function RepoCard({ repo }: { repo: Repository }) {
         router.push(`/chat/${repo.id}`);
     }
 
+    function openWorkspace() {
+        router.push(`/chat/${repo.id}?mode=open`);
+    }
+
     function handlePrimary() {
         if (repo.indexStatus === "READY") {
-            openChat();
+            openWorkspace();
             return;
         }
         indexMutation.mutate(repo.id, {
-            onSuccess: () => router.push(`/chat/${repo.id}`),
+            onSuccess: () => router.push(`/chat/${repo.id}?mode=open`),
         });
     }
 
     return (
         <article
             className={cn(
-                "group flex flex-col overflow-hidden rounded-2xl border border-dashed bg-card/80 shadow-md shadow-foreground/5 transition-all",
-                isFailed
-                    ? "border-destructive/30 bg-destructive/2 hover:border-destructive/40"
-                    : "border-border/80 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-lg hover:shadow-foreground/10"
+                "group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs transition-all hover:border-border hover:shadow-sm",
+                isFailed && "border-destructive/30 bg-destructive/[0.02] hover:border-destructive/40"
             )}
         >
-            <div className="border-b border-dashed border-border/70 p-4">
+            <div className="border-b border-border/60 p-3.5">
                 <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-2.5">
                         <LanguageBadge language={repo.language} showLabel={false} />
                         <div className="min-w-0">
                             <p className="truncate text-xs text-muted-foreground">{repo.owner}</p>
-                            <h3 className="truncate font-medium">{repo.name}</h3>
+                            <h3 className="truncate font-semibold text-sm">{repo.name}</h3>
                         </div>
                     </div>
                     <IndexStatusBadge status={repo.indexStatus} hasNewCommit={hasNewCommit} />
                 </div>
             </div>
 
-            <div className="flex flex-1 flex-col gap-3 p-4">
+            <div className="flex flex-1 flex-col gap-2.5 p-3.5">
                 {!isFailed && (
-                    <p className="line-clamp-2 min-h-10 text-sm text-muted-foreground">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
                         {repo.description || "No description provided."}
                     </p>
                 )}
 
                 {isFailed && repo.description && (
-                    <p className="line-clamp-1 text-sm text-muted-foreground">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
                         {repo.description}
                     </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {repo.isPrivate && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs text-muted-foreground">
-              <Lock className="size-3" />
-              Private
-            </span>
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            <Lock className="size-3" />
+                            Private
+                        </span>
                     )}
-                    <span className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs text-muted-foreground">
-            <GitBranch className="size-3" />
+                    <span className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        <GitBranch className="size-3" />
                         {repo.defaultBranch}
-          </span>
+                    </span>
                     {repo.language && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed px-2 py-0.5 text-xs">
-              <LanguageIcon language={repo.language} size="sm" />
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium">
+                            <LanguageIcon language={repo.language} size="sm" />
                             {repo.language}
-            </span>
+                        </span>
                     )}
                     {repo.chunkCount > 0 && (
                         <span
                             className={cn(
-                                "rounded-full border border-dashed px-2 py-0.5 text-xs",
+                                "rounded-md border border-border/80 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium",
                                 isFailed
                                     ? "border-destructive/20 text-destructive/80"
                                     : "text-muted-foreground"
                             )}
                         >
-              {repo.chunkCount.toLocaleString()} chunks
+                            {repo.chunkCount.toLocaleString()} chunks
                             {isFailed ? " indexed" : ""}
-            </span>
+                        </span>
                     )}
                 </div>
 
                 {hasNewCommit && !isIndexing && (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs text-amber-600 dark:text-amber-400">
+                    <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-400">
                         <GitBranch className="size-3.5 shrink-0" />
-                        <span className="truncate">New commit available ({repo.latestCommitSha?.slice(0, 7)})</span>
+                        <span className="truncate">New commit ({repo.latestCommitSha?.slice(0, 7)})</span>
                     </div>
                 )}
 
                 {isIndexing && (
-                    <div className="space-y-2 rounded-xl border border-dashed bg-muted/30 p-3">
+                    <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/30 p-2.5">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>Indexing…</span>
                             <span>
-                {repo.filesProcessed}/{repo.filesTotal || "?"}
-              </span>
+                                {repo.filesProcessed}/{repo.filesTotal || "?"}
+                            </span>
                         </div>
-                        <Progress value={progress || 8} />
+                        <Progress value={progress || 8} className="h-1.5" />
                     </div>
                 )}
 
@@ -142,7 +144,7 @@ export function RepoCard({ repo }: { repo: Repository }) {
                 )}
             </div>
 
-            <div className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-border/70 p-4">
+            <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 p-3.5">
                 {repo.htmlUrl ? (
                     <a
                         href={repo.htmlUrl}
@@ -150,7 +152,7 @@ export function RepoCard({ repo }: { repo: Repository }) {
                         rel="noreferrer"
                         className={cn(
                             buttonVariants({ variant: "ghost", size: "sm" }),
-                            "gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                            "h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                         )}
                     >
                         <ExternalLink className="size-3.5" />

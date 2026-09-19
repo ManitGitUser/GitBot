@@ -10,11 +10,13 @@ import { Spinner } from "@/components/ui/spinner";
 
 export function ChatComposer({
     disabled,
+    placeholder,
     streaming,
     onSend,
     onStop,
 }: {
     disabled?: boolean;
+    placeholder?: string;
     streaming?: boolean;
     onSend: (content: string) => void | Promise<void>;
     onStop?: () => void;
@@ -37,14 +39,14 @@ export function ChatComposer({
     }
 
     return (
-        <div className="border-t bg-background/80 p-4 backdrop-blur">
-            <div className="mx-auto max-w-3xl space-y-2">
+        <div className="shrink-0 border-t bg-background/80 py-3 sm:py-4 backdrop-blur">
+            <div className="mx-auto w-full max-w-4xl space-y-2 px-4 sm:px-6 transition-all">
                 <div className="flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-xs transition-colors focus-within:border-ring/60 focus-within:ring-1 focus-within:ring-ring/40">
                     <Textarea
                         ref={textareaRef}
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
-                        placeholder="Ask about architecture, files, flows…"
+                        placeholder={placeholder || "Ask about architecture, files, flows…"}
                         disabled={disabled}
                         aria-label="Ask a question about this repository"
                         className="min-h-12 flex-1 border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0 resize-none text-sm"

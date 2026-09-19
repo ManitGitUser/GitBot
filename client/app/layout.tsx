@@ -33,13 +33,14 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
+        "bg-background text-foreground",
         geistSans.variable,
         geistMono.variable,
         jetbrainsMono.variable,
       )}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-background text-foreground">
         <QueryProvider>
           <ThemeProvider
             attribute="class"

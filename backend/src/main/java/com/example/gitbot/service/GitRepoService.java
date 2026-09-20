@@ -193,11 +193,8 @@ public class GitRepoService {
         }
 
         // Phase B — short database transaction: load existing repositories, upsert/persist state
-        if (transactionTemplate != null) {
-            return transactionTemplate.execute(status -> persistSyncState(userId, discoveredRepos));
-        } else {
-            return persistSyncState(userId, discoveredRepos);
-        }
+        Objects.requireNonNull(transactionTemplate, "TransactionTemplate must be configured for syncAllRepos");
+        return transactionTemplate.execute(status -> persistSyncState(userId, discoveredRepos));
     }
 
     private SyncAllReposResponse persistSyncState(UUID userId, List<DiscoveredRepo> discoveredRepos) {

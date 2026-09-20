@@ -37,6 +37,8 @@ class SyncAllReposTest {
     private GitHubApiClient gitHubApiClient;
     @Mock
     private IndexingService indexingService;
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private GitRepoService gitRepoService;
@@ -52,6 +54,11 @@ class SyncAllReposTest {
                 .githubUsername("octocat")
                 .accessToken("enc_token")
                 .build();
+
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
     }
 
     @Test

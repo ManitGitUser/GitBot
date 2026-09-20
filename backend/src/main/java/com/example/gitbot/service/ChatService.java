@@ -206,12 +206,16 @@ public class ChatService {
 
         // 5. Stream LLM response
         ChatTimingContext.set(timing);
-        return chatStreamHandler.stream(
-                session.getId(),
-                toMessageResponse(userMessage),
-                retrievedContext.citations(),
-                promptMessages,
-                null);
+        try {
+            return chatStreamHandler.stream(
+                    session.getId(),
+                    toMessageResponse(userMessage),
+                    retrievedContext.citations(),
+                    promptMessages,
+                    null);
+        } finally {
+            ChatTimingContext.clear();
+        }
     }
 
     public SseEmitter streamRetry(UUID userId, UUID sessionId, UUID messageId) {
@@ -286,12 +290,16 @@ public class ChatService {
         timing.setPromptBuildDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - promptStart));
 
         ChatTimingContext.set(timing);
-        return chatStreamHandler.stream(
-                session.getId(),
-                toMessageResponse(userMsg),
-                retrievedContext.citations(),
-                promptMessages,
-                assistantMsg != null ? assistantMsg.getId() : null);
+        try {
+            return chatStreamHandler.stream(
+                    session.getId(),
+                    toMessageResponse(userMsg),
+                    retrievedContext.citations(),
+                    promptMessages,
+                    assistantMsg != null ? assistantMsg.getId() : null);
+        } finally {
+            ChatTimingContext.clear();
+        }
     }
 
     @Transactional

@@ -109,4 +109,18 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.displayName").value("Manit Updated"))
                 .andExpect(jsonPath("$.avatarUrl").value("https://avatars.githubusercontent.com/u/197362476?v=4"));
     }
+
+    @Test
+    @DisplayName("DELETE /api/auth/account deletes user and returns 204 No Content")
+    void deleteAccount_returnsNoContent() throws Exception {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).githubUsername("testuser").build();
+        AppUserPrincipal principal = new AppUserPrincipal(user, Map.of("id", 12345L));
+        when(currentUser.require()).thenReturn(principal);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/auth/account"))
+                .andExpect(status().isNoContent());
+
+        org.mockito.Mockito.verify(userService).deleteAccount(userId);
+    }
 }

@@ -18,5 +18,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
 
     Optional<ChatSession> findByIdAndUserId(UUID id, UUID userId);
 
+    List<ChatSession> findByUserId(UUID userId);
+
     Optional<ChatSession> findByShareTokenAndIsSharedTrue(String shareToken);
 }

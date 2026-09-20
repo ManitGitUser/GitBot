@@ -7,10 +7,16 @@ import com.example.gitbot.security.CurrentUser;
 import com.example.gitbot.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Map;
 
@@ -51,6 +57,26 @@ public class AuthController {
                 user.getDisplayName(),
                 user.getAvatarUrl()
         ));
+    }
+
+    @DeleteMapping("/account")
+    public ResponseEntity<Void> deleteAccount(HttpServletRequest request, HttpServletResponse response) {
+        AppUserPrincipal principal = currUser.require();
+        userServ.deleteAccount(principal.getId());
+
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        SecurityContextHolder.clearContext();
+
+        Cookie cookie = new Cookie("GITBOT_SESSION", null);
+        cookie.setPath("/");
+        cookie.setHttpOnly(true);
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
+
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/csrf")

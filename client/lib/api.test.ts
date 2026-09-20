@@ -164,3 +164,27 @@ test("api.me - normalizes clean and markdown-wrapped avatar URLs", async () => {
         globalThis.fetch = originalFetch;
     }
 });
+
+test("api.deleteAccount - sends DELETE request to /api/auth/account", async () => {
+    const { api } = await import("./api.ts");
+
+    let capturedUrl = "";
+    let capturedMethod = "";
+
+    globalThis.fetch = async (input, init) => {
+        capturedUrl = typeof input === "string" ? input : input.toString();
+        capturedMethod = init?.method || "GET";
+        return new Response(null, {
+            status: 204,
+            statusText: "No Content",
+        });
+    };
+
+    try {
+        await api.deleteAccount();
+        assert.ok(capturedUrl.endsWith("/api/auth/account"), `Expected ${capturedUrl} to end with /api/auth/account`);
+        assert.strictEqual(capturedMethod, "DELETE");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

@@ -76,3 +76,29 @@ export function useSyncProfile() {
         },
     });
 }
+
+export function useDeleteAccount() {
+    const queryClient = useQueryClient();
+    const router = useRouter();
+
+    return useMutation({
+        mutationFn: () => api.deleteAccount(),
+        onSuccess: async () => {
+            setAuthCookie(false);
+            queryClient.clear();
+            toast.add({
+                title: "Account deleted",
+                description: "Your account and all associated GitBot data have been permanently removed.",
+                type: "success",
+            });
+            router.replace("/");
+        },
+        onError: (error: Error) => {
+            toast.add({
+                title: "Unable to delete account",
+                description: error.message || "An error occurred while deleting your account. Please try again.",
+                type: "error",
+            });
+        },
+    });
+}

@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface MessageReportRepository extends JpaRepository<MessageReport, UUID> {
     boolean existsByUserIdAndMessageId(UUID userId, UUID messageId);
     void deleteBySessionId(UUID sessionId);
+    void deleteByUserId(UUID userId);
 }

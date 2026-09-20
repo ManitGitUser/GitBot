@@ -265,6 +265,10 @@ export const api = {
         apiFetch<void>("/api/auth/logout", {
             method: "POST",
         }),
+    deleteAccount: () =>
+        apiFetch<void>("/api/auth/account", {
+            method: "DELETE",
+        }),
 
     listRepos: (
         page = 0,

@@ -125,6 +125,14 @@ export function ChatView({ repoId }: { repoId: string }) {
             : allSessions[0] ?? null);
     const sessionId = activeSession?.id ?? selectedSessionId ?? null;
 
+    useEffect(() => {
+        if (activeSession?.title) {
+            document.title = `${activeSession.title} - GitBot`;
+        } else {
+            document.title = "Chat - GitBot";
+        }
+    }, [activeSession?.title]);
+
     const messagesQuery = useChatMessages(sessionId);
     const { send, retry, stop, streaming, streamText, retryingMessageId } = useStreamChat(sessionId);
 

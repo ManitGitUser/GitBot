@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, Check, Copy, ExternalLink, Globe, ShieldAlert, UserRound } from "lucide-react";
+import { Check, Copy, ExternalLink, Globe, ShieldAlert, UserRound } from "lucide-react";
 
+import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +86,7 @@ export default function SharedChatPage({
                 if (mounted) {
                     setData(res);
                     setLoading(false);
+                    document.title = res?.title ? `${res.title} - GitBot` : "Shared Chat - GitBot";
                 }
             })
             .catch((err) => {
@@ -134,9 +136,8 @@ export default function SharedChatPage({
             <header className="flex items-center justify-between border-b bg-card px-6 py-4">
                 <div className="flex items-center gap-3">
                     <Link href="/" className="flex items-center gap-2 font-semibold">
-                        <span className="rounded-lg bg-primary/10 px-2 py-1 text-sm text-primary">
-                            GitBot
-                        </span>
+                        <GitBotIcon className="size-6 rounded-md" />
+                        <span className="font-heading text-sm font-semibold">GitBot</span>
                     </Link>
                     <span className="text-sm font-medium">{data.title}</span>
                 </div>
@@ -182,13 +183,13 @@ export default function SharedChatPage({
                                                 className={cn(
                                                     isUser
                                                         ? "bg-primary text-primary-foreground"
-                                                        : "bg-muted"
+                                                        : "bg-transparent p-0"
                                                 )}
                                             >
                                                 {isUser ? (
                                                     <UserRound className="size-4" />
                                                 ) : (
-                                                    <Bot className="size-4" />
+                                                    <GitBotIcon className="size-8 rounded-lg" />
                                                 )}
                                             </AvatarFallback>
                                         </Avatar>

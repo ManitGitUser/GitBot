@@ -231,13 +231,25 @@ export async function apiFetch<T>(
     return JSON.parse(text) as T;
 }
 
+function cleanAvatarUrl(url: string | null | undefined): string | null {
+    if (!url) return null;
+    const trimmed = url.trim();
+    if (trimmed.startsWith("[") && trimmed.includes("](") && trimmed.endsWith(")")) {
+        return trimmed.slice(trimmed.indexOf("](") + 2, -1).trim() || null;
+    }
+    return trimmed || null;
+}
+
 export const api = {
     csrf: () => apiFetch<{ token: string; headerName: string; parameterName: string }>("/api/auth/csrf"),
     me: async () => {
         const raw = await apiFetch<User & { avatar_url?: string }>("/api/auth/me");
+        console.log("[GitBot Avatar] api.me raw response:", raw);
+        const mappedUrl = cleanAvatarUrl(raw.avatarUrl || raw.avatar_url);
+        console.log("[GitBot Avatar] api.me mapped avatarUrl:", mappedUrl);
         return {
             ...raw,
-            avatarUrl: raw.avatarUrl || raw.avatar_url || null,
+            avatarUrl: mappedUrl,
         };
     },
     syncProfile: async () => {
@@ -246,7 +258,7 @@ export const api = {
         });
         return {
             ...raw,
-            avatarUrl: raw.avatarUrl || raw.avatar_url || null,
+            avatarUrl: cleanAvatarUrl(raw.avatarUrl || raw.avatar_url),
         };
     },
     logout: () =>

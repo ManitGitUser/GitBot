@@ -138,3 +138,29 @@ test("apiFetch - surfaces real error response with empty body safely", async () 
         globalThis.fetch = originalFetch;
     }
 });
+
+test("api.me - normalizes clean and markdown-wrapped avatar URLs", async () => {
+    const { api } = await import("./api.ts");
+
+    globalThis.fetch = async () =>
+        new Response(
+            JSON.stringify({
+                id: "test-id",
+                githubId: 197362476,
+                githubUsername: "ManitGitUser",
+                displayName: "Manit",
+                avatarUrl: "[https://avatars.githubusercontent.com/u/197362476?v=4](https://avatars.githubusercontent.com/u/197362476?v=4)",
+            }),
+            {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            }
+        );
+
+    try {
+        const user = await api.me();
+        assert.strictEqual(user.avatarUrl, "https://avatars.githubusercontent.com/u/197362476?v=4");
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

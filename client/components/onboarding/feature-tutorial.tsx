@@ -43,7 +43,7 @@ const slides: TutorialSlide[] = [
         description:
             "GitBot connects directly to your GitHub repositories, giving you an intelligent chat assistant that understands your actual codebase, dependencies, and architecture.",
         icon: GitBotIcon,
-        accentColor: "text-teal-500 bg-teal-500/10 border-teal-500/20",
+        accentColor: "bg-black text-white border-border/60",
         points: [
             "Seamless GitHub OAuth integration",
             "Deep codebase understanding via RAG",

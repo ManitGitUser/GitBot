@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { FolderGit2 } from "lucide-react";
 

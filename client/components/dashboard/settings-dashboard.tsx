@@ -6,7 +6,6 @@ import { useTheme } from "next-themes";
 import { GitHubIcon } from "@/components/icons/github-icon";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -38,15 +37,21 @@ export function SettingsDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
-                        <Avatar className="size-14 rounded-xl">
-                            <AvatarImage
-                                src={user?.avatarUrl ?? undefined}
-                                alt={user?.displayName}
-                            />
-                            <AvatarFallback className="rounded-xl">
-                                {(user?.displayName ?? "DP").slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                        </Avatar>
+                        <div className="relative size-14 shrink-0 overflow-hidden rounded-xl">
+                            {user?.avatarUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={user.avatarUrl}
+                                    alt={user?.displayName || "User"}
+                                    referrerPolicy="no-referrer"
+                                    className="size-full object-cover"
+                                />
+                            ) : (
+                                <div className="flex size-full items-center justify-center bg-muted text-lg font-medium text-muted-foreground select-none">
+                                    {(user?.displayName ?? "DP").slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                        </div>
                         <div className="min-w-0">
                             <p className="truncate font-medium">{user?.displayName}</p>
                             <p className="truncate text-sm text-muted-foreground">

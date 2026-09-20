@@ -111,4 +111,34 @@ class UserServiceTest {
 
         verify(userRepository).save(existing);
     }
+
+    @Test
+    void normalizeAvatarUrl_handlesCleanAndMarkdownUrls() {
+        assertThat(UserService.normalizeAvatarUrl("https://avatars.githubusercontent.com/u/197362476?v=4"))
+                .isEqualTo("https://avatars.githubusercontent.com/u/197362476?v=4");
+
+        assertThat(UserService.normalizeAvatarUrl("[https://avatars.githubusercontent.com/u/197362476?v=4](https://avatars.githubusercontent.com/u/197362476?v=4)"))
+                .isEqualTo("https://avatars.githubusercontent.com/u/197362476?v=4");
+
+        assertThat(UserService.normalizeAvatarUrl(null)).isNull();
+        assertThat(UserService.normalizeAvatarUrl("")).isNull();
+        assertThat(UserService.normalizeAvatarUrl("   ")).isNull();
+    }
+
+    @Test
+    void upsertFromGitHub_normalizesMarkdownAvatarUrl() {
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("id", 197362476L);
+        attributes.put("login", "ManitGitUser");
+        attributes.put("name", "Manit");
+        attributes.put("avatar_url", "[https://avatars.githubusercontent.com/u/197362476?v=4](https://avatars.githubusercontent.com/u/197362476?v=4)");
+
+        when(userRepository.findByGithubId(197362476L)).thenReturn(Optional.empty());
+        when(tokenEncryptor.encrypt("raw_token")).thenReturn("enc_token");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User user = userService.upsertFromGitHub(attributes, "raw_token", "read:user,repo");
+
+        assertThat(user.getAvatarUrl()).isEqualTo("https://avatars.githubusercontent.com/u/197362476?v=4");
+    }
 }

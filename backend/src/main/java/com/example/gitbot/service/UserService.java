@@ -40,6 +40,23 @@ public class UserService {
         return Long.parseLong(String.valueOf(value));
     }
 
+    static String normalizeAvatarUrl(Object avatarObj) {
+        if (avatarObj == null) {
+            return null;
+        }
+        String url = avatarObj.toString().trim();
+        if (url.isEmpty()) {
+            return null;
+        }
+        // Normalize [label](url) markdown link syntax to raw url if present
+        if (url.startsWith("[") && url.contains("](") && url.endsWith(")")) {
+            int start = url.indexOf("](") + 2;
+            int end = url.length() - 1;
+            url = url.substring(start, end).trim();
+        }
+        return url;
+    }
+
     public User upsertFromGitHub(Map<String, Object> attributes, String accessToken, String scopes) {
 
         Long githubId = toLong(attributes.get("id"));
@@ -48,7 +65,7 @@ public class UserService {
                 ? attributes.get("name").toString()
                 : login;
         Object avatarObj = attributes.get("avatar_url");
-        String avatarUrl = avatarObj != null ? avatarObj.toString() : null;
+        String avatarUrl = normalizeAvatarUrl(avatarObj);
 
         String encryptedToken = tokenEncryptor.encrypt(accessToken);
 
@@ -78,7 +95,7 @@ public class UserService {
                 user.setDisplayName(user.getGithubUsername());
             }
             if (profile.get("avatar_url") != null) {
-                user.setAvatarUrl(String.valueOf(profile.get("avatar_url")));
+                user.setAvatarUrl(normalizeAvatarUrl(profile.get("avatar_url")));
             }
             user = userRepo.save(user);
         }

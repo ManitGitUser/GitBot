@@ -1,18 +1,21 @@
-"use client";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { Suspense, use } from "react";
-
-import { ChatView }  from "@/components/chat/chat-view";
+import { ChatView } from "@/components/chat/chat-view";
 import { AppShell } from "@/components/layout/app-shell";
 import { RequireAuth } from "@/components/providers/require-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function ChatPage({
-                                     params,
-                                 }: {
+export const metadata: Metadata = {
+    title: "Chat",
+};
+
+export default async function ChatPage({
+    params,
+}: {
     params: Promise<{ repoId: string }>;
 }) {
-    const { repoId } = use(params);
+    const { repoId } = await params;
 
     return (
         <RequireAuth>

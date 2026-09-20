@@ -19,8 +19,19 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GitBot — AI-Powered Codebase Assistant",
+  title: {
+    default: "GitBot",
+    template: "%s - GitBot",
+  },
   description: "Index your GitHub repositories and chat with your codebase using RAG vector search.",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

@@ -18,7 +18,6 @@ import { useEffect, useRef, useState } from "react";
 import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { CitationChips } from "@/components/chat/citation-chips";
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -476,25 +475,27 @@ export function ChatMessages({
                                     )}
                                 >
                                     <MessageAvatar>
-                                        <Avatar className="size-8">
-                                            {isUser ? (
-                                                <>
-                                                    {user?.avatarUrl && (
-                                                        <AvatarImage
-                                                            src={user.avatarUrl}
-                                                            alt={user.displayName || user.githubUsername || "User"}
-                                                        />
-                                                    )}
-                                                    <AvatarFallback className="bg-primary text-primary-foreground">
+                                        {isUser ? (
+                                            <div className="relative size-8 shrink-0 overflow-hidden rounded-full">
+                                                {user?.avatarUrl ? (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img
+                                                        src={user.avatarUrl}
+                                                        alt={user.displayName || user.githubUsername || "User"}
+                                                        referrerPolicy="no-referrer"
+                                                        className="size-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="flex size-full items-center justify-center bg-primary text-primary-foreground">
                                                         <UserRound className="size-4" />
-                                                    </AvatarFallback>
-                                                </>
-                                            ) : (
-                                                <AvatarFallback className="bg-transparent p-0">
-                                                    <GitBotIcon className="size-8" />
-                                                </AvatarFallback>
-                                            )}
-                                        </Avatar>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent p-0">
+                                                <GitBotIcon className="size-8 rounded-lg" />
+                                            </div>
+                                        )}
                                     </MessageAvatar>
                                     <MessageContent>
                                         <Bubble
@@ -593,11 +594,9 @@ export function ChatMessages({
                         {streamText && !retryingMessageId && (
                             <Message align="start" className="group/msg relative w-full max-w-full">
                                 <MessageAvatar>
-                                    <Avatar className="size-8">
-                                        <AvatarFallback className="bg-transparent p-0">
-                                            <GitBotIcon className="size-8" />
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent p-0">
+                                        <GitBotIcon className="size-8 rounded-lg" />
+                                    </div>
                                 </MessageAvatar>
                                 <MessageContent>
                                     <Bubble variant="ghost" align="start" className="max-w-full bg-transparent border-none shadow-none">

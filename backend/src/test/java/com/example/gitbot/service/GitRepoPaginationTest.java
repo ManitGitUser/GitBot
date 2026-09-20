@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,7 +57,7 @@ class GitRepoPaginationTest {
         }
 
         Pageable pageable = PageRequest.of(0, 10);
-        when(gitRepoRepository.findByUserIdOrderByFullNameAsc(eq(userId), eq(pageable)))
+        when(gitRepoRepository.findWithFilters(eq(userId), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(repos, pageable, 25));
 
         PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, pageable);
@@ -69,7 +70,7 @@ class GitRepoPaginationTest {
         assertThat(result.hasNext()).isTrue();
         assertThat(result.hasPrevious()).isFalse();
 
-        verify(gitRepoRepository).findByUserIdOrderByFullNameAsc(userId, pageable);
+        verify(gitRepoRepository).findWithFilters(userId, null, null, null, pageable);
     }
 
     @Test
@@ -88,7 +89,7 @@ class GitRepoPaginationTest {
         }
 
         Pageable pageable = PageRequest.of(1, 10);
-        when(gitRepoRepository.findByUserIdOrderByFullNameAsc(eq(userId), eq(pageable)))
+        when(gitRepoRepository.findWithFilters(eq(userId), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(repos, pageable, 25));
 
         PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, pageable);

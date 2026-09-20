@@ -16,3 +16,35 @@ export const PROJECT_CONFIG = {
     // Demo video / documentation reference on the repository README
     demoUrl: "https://github.com/ManitGitUser/GitBot#demo",
 } as const;
+
+export function getBugReportMailto(): string {
+    const subject = "GitBot Bug Report";
+    const body = `Hi Manit,
+
+I found a bug in GitBot.
+
+What happened:
+[Please describe the issue]
+
+Steps to reproduce:
+[Please provide the steps]
+
+Expected behavior:
+[What should have happened?]
+
+Browser/device:
+[Optional]
+
+GitBot page:
+[Optional]
+
+Thanks.`;
+
+    const params = new URLSearchParams({
+        subject,
+        body,
+    });
+
+    return `mailto:${PROJECT_CONFIG.developer.email}?${params.toString().replace(/\+/g, "%20")}`;
+}
+

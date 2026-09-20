@@ -3,86 +3,19 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type AvatarContextValue = {
-  imageLoaded: boolean;
-  setImageLoaded: (loaded: boolean) => void;
-};
-
-const AvatarContext = React.createContext<AvatarContextValue>({
-  imageLoaded: false,
-  setImageLoaded: () => {},
-});
-
 function Avatar({
   className,
   size = "default",
-  children,
   ...props
-}: React.ComponentProps<"span"> & {
+}: React.ComponentProps<"div"> & {
   size?: "default" | "sm" | "lg";
 }) {
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-
   return (
-    <AvatarContext.Provider value={{ imageLoaded, setImageLoaded }}>
-      <span
-        data-slot="avatar"
-        data-size={size}
-        className={cn(
-          "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </span>
-    </AvatarContext.Provider>
-  );
-}
-
-function AvatarImage({
-  className,
-  src,
-  alt,
-  referrerPolicy = "no-referrer",
-  onLoad,
-  onError,
-  ...props
-}: React.ComponentProps<"img">) {
-  const { setImageLoaded } = React.useContext(AvatarContext);
-  const [hasError, setHasError] = React.useState(false);
-  const [prevSrc, setPrevSrc] = React.useState(src);
-
-  if (prevSrc !== src) {
-    setPrevSrc(src);
-    setHasError(false);
-    if (!src) {
-      setImageLoaded(false);
-    }
-  }
-
-  if (!src || hasError) {
-    return null;
-  }
-
-  return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      data-slot="avatar-image"
-      src={src}
-      alt={alt || ""}
-      referrerPolicy={referrerPolicy}
-      onLoad={(e) => {
-        setImageLoaded(true);
-        onLoad?.(e);
-      }}
-      onError={(e) => {
-        setHasError(true);
-        setImageLoaded(false);
-        onError?.(e);
-      }}
+    <div
+      data-slot="avatar"
+      data-size={size}
       className={cn(
-        "aspect-square size-full rounded-full object-cover",
+        "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full select-none data-[size=lg]:size-10 data-[size=sm]:size-6",
         className
       )}
       {...props}
@@ -90,28 +23,44 @@ function AvatarImage({
   );
 }
 
+function AvatarImage({
+  className,
+  src,
+  alt,
+  ...props
+}: React.ComponentProps<"img">) {
+  if (!src) return null;
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      data-slot="avatar-image"
+      src={src}
+      alt={alt}
+      className={cn(
+        "relative z-10 aspect-square size-full object-cover",
+        className
+      )}
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+      }}
+      {...props}
+    />
+  );
+}
+
 function AvatarFallback({
   className,
-  children,
   ...props
 }: React.ComponentProps<"span">) {
-  const { imageLoaded } = React.useContext(AvatarContext);
-
-  if (imageLoaded) {
-    return null;
-  }
-
   return (
     <span
       data-slot="avatar-fallback"
       className={cn(
-        "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
+        "absolute inset-0 z-0 flex size-full items-center justify-center bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
         className
       )}
       {...props}
-    >
-      {children}
-    </span>
+    />
   );
 }
 

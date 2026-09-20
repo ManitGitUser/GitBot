@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Info, LogOut, MessageSquare, RefreshCw, Settings, Sparkles } from "lucide-react";
+import { Bug, Info, LogOut, MessageSquare, RefreshCw, Settings, Sparkles } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { FeatureTutorial, ONBOARDING_STORAGE_KEY } from "@/components/onboarding/feature-tutorial";
 import { AboutGitBotDialog } from "@/components/about/about-gitbot-dialog";
+import { getBugReportMailto } from "@/lib/project-config";
 
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useCurrentUser, useLogout, useSyncProfile } from "@/hooks/use-auth";
 import { useRecentChatSessions } from "@/hooks/use-chat";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -67,6 +67,8 @@ export function AppShell({
     const pathname = usePathname();
     const router = useRouter();
     const { data: user, isLoading: isAuthLoading } = useCurrentUser();
+    console.log("[REAL APP USER]", user);
+    console.log("[REAL APP AVATAR]", JSON.stringify(user?.avatarUrl));
     const { data: recentSessions } = useRecentChatSessions(10);
     const logout = useLogout();
     const syncProfile = useSyncProfile();
@@ -198,6 +200,15 @@ export function AppShell({
                                         <span>About GitBot</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton
+                                        tooltip="Report a bug"
+                                        render={<a href={getBugReportMailto()} />}
+                                    >
+                                        <Bug />
+                                        <span>Report a bug</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
@@ -215,17 +226,21 @@ export function AppShell({
                                         />
                                     }
                                 >
-                                    <Avatar className="size-8 rounded-lg">
-                                        {user?.avatarUrl && (
-                                            <AvatarImage
+                                    <div className="relative size-8 shrink-0 overflow-hidden rounded-lg">
+                                        {user?.avatarUrl ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img
                                                 src={user.avatarUrl}
-                                                alt={user?.displayName || "User"}
+                                                alt={user?.displayName || user?.githubUsername || "User"}
+                                                referrerPolicy="no-referrer"
+                                                className="size-full object-cover"
                                             />
+                                        ) : (
+                                            <div className="flex size-full items-center justify-center bg-muted text-sm font-medium text-muted-foreground select-none">
+                                                {(user?.displayName || user?.githubUsername || "U").slice(0, 2).toUpperCase()}
+                                            </div>
                                         )}
-                                        <AvatarFallback className="rounded-lg">
-                                            {(user?.displayName ?? "DP").slice(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    </div>
                                     <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                     <span className="truncate font-medium">
                       {user?.displayName}

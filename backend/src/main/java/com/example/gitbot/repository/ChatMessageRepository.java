@@ -41,5 +41,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
             Pageable pageable
     );
 
+    @Query("""
+        SELECT m FROM ChatMessage m
+        WHERE m.sessionId = :sessionId
+          AND (m.createdAt > :afterCreatedAt OR (m.createdAt = :afterCreatedAt AND m.id > :afterId))
+        ORDER BY m.createdAt ASC, m.id ASC
+    """)
+    List<ChatMessage> findMessagesAfter(
+            @Param("sessionId") UUID sessionId,
+            @Param("afterCreatedAt") Instant afterCreatedAt,
+            @Param("afterId") UUID afterId,
+            Pageable pageable
+    );
+
     void deleteBySessionId(UUID sessionId);
 }

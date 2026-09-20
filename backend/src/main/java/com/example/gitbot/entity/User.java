@@ -2,12 +2,11 @@ package com.example.gitbot.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.jetbrains.annotations.NotNull;
 
 import java.time.Instant;
 import java.util.UUID;
 
-@Table(name="users")
+@Table(name = "users")
 @Entity
 // @Data
 @Getter
@@ -33,7 +32,7 @@ public class User {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
-    @Column(name = "access_token",  nullable = false, columnDefinition = "TEXT")
+    @Column(name = "access_token", nullable = false, columnDefinition = "TEXT")
     private String accessToken;
 
     @Column(name = "token_scopes", length = 100)

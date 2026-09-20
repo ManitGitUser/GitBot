@@ -1,7 +1,3 @@
-
-
-create extension if not exists vector;
-
-create extension if not exists hstore;
-
-create extension if not exists "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS hstore;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

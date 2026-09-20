@@ -67,8 +67,6 @@ export function AppShell({
     const pathname = usePathname();
     const router = useRouter();
     const { data: user, isLoading: isAuthLoading } = useCurrentUser();
-    console.log("[REAL APP USER]", user);
-    console.log("[REAL APP AVATAR]", JSON.stringify(user?.avatarUrl));
     const { data: recentSessions } = useRecentChatSessions(10);
     const logout = useLogout();
     const syncProfile = useSyncProfile();

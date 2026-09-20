@@ -7,8 +7,11 @@ import java.util.UUID;
 
 import com.example.gitbot.dto.ChatMessageResponse;
 import com.example.gitbot.dto.ChatSessionResponse;
+import com.example.gitbot.dto.ChatTimingContext;
+import com.example.gitbot.dto.ChatTimingMetrics;
 import com.example.gitbot.dto.CreateChatSessionRequest;
 import com.example.gitbot.dto.PublicSharedChatResponse;
+import java.util.concurrent.TimeUnit;
 import com.example.gitbot.dto.ShareResponse;
 import com.example.gitbot.entity.ChatMessage;
 import com.example.gitbot.entity.ChatSession;
@@ -25,7 +28,6 @@ import com.example.gitbot.repository.ChatSessionRepository;
 import com.example.gitbot.repository.MessageReportRepository;
 import com.example.gitbot.service.ai.ChatPromptBuilder;
 import com.example.gitbot.service.ai.ChatStreamHandler;
-import com.example.gitbot.service.ai.CitationMapper;
 import com.example.gitbot.service.ai.CodeContextRetriever;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.messages.Message;
@@ -48,7 +50,6 @@ public class ChatService {
     private final CodeContextRetriever codeContextRetriever;
     private final ChatPromptBuilder chatPromptBuilder;
     private final ChatStreamHandler chatStreamHandler;
-    private final CitationMapper citationMapper;
 
     @Transactional
     public ChatSessionResponse createSession(UUID userId, CreateChatSessionRequest request) {
@@ -71,22 +72,14 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public com.example.gitbot.dto.PageResponse<ChatSessionResponse> listSessions(UUID userId, UUID repositoryId, org.springframework.data.domain.Pageable pageable) {
+    public com.example.gitbot.dto.PageResponse<ChatSessionResponse> listSessions(UUID userId, UUID repositoryId,
+            org.springframework.data.domain.Pageable pageable) {
         gitRepoService.requireOwned(repositoryId, userId);
         org.springframework.data.domain.Page<ChatSession> page = chatSessionRepository
                 .findByUserIdAndRepositoryIdOrderByCreatedAtDesc(userId, repositoryId, pageable);
         return com.example.gitbot.dto.PageResponse.of(page.map(this::toSessionResponse));
     }
 
-    @Transactional(readOnly = true)
-    public List<ChatSessionResponse> listSessions(UUID userId, UUID repositoryId) {
-        gitRepoService.requireOwned(repositoryId, userId);
-        return chatSessionRepository
-                .findByUserIdAndRepositoryIdOrderByCreatedAtDesc(userId, repositoryId)
-                .stream()
-                .map(this::toSessionResponse)
-                .toList();
-    }
 
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> listRecentSessions(UUID userId, int limit) {
@@ -99,7 +92,8 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public com.example.gitbot.dto.PagedMessagesResponse getMessages(UUID userId, UUID sessionId, String before, int limit) {
+    public com.example.gitbot.dto.PagedMessagesResponse getMessages(UUID userId, UUID sessionId, String before,
+            int limit) {
         ChatSession session = requireSession(userId, sessionId);
         int validLimit = limit > 0 ? limit : 10;
         int queryLimit = validLimit + 1;
@@ -115,25 +109,21 @@ public class ChatService {
                             session.getId(),
                             beforeCreatedAt,
                             beforeId,
-                            org.springframework.data.domain.PageRequest.of(0, queryLimit)
-                    );
+                            org.springframework.data.domain.PageRequest.of(0, queryLimit));
                 } catch (Exception ex) {
                     descMessages = chatMessageRepository.findLatestMessages(
                             session.getId(),
-                            org.springframework.data.domain.PageRequest.of(0, queryLimit)
-                    );
+                            org.springframework.data.domain.PageRequest.of(0, queryLimit));
                 }
             } else {
                 descMessages = chatMessageRepository.findLatestMessages(
                         session.getId(),
-                        org.springframework.data.domain.PageRequest.of(0, queryLimit)
-                );
+                        org.springframework.data.domain.PageRequest.of(0, queryLimit));
             }
         } else {
             descMessages = chatMessageRepository.findLatestMessages(
                     session.getId(),
-                    org.springframework.data.domain.PageRequest.of(0, queryLimit)
-            );
+                    org.springframework.data.domain.PageRequest.of(0, queryLimit));
         }
 
         boolean hasMore = descMessages.size() > validLimit;
@@ -156,13 +146,6 @@ public class ChatService {
         return new com.example.gitbot.dto.PagedMessagesResponse(chronological, hasMore, nextCursor);
     }
 
-    @Transactional(readOnly = true)
-    public List<ChatMessageResponse> getMessages(UUID userId, UUID sessionId) {
-        ChatSession session = requireSession(userId, sessionId);
-        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId()).stream()
-                .map(this::toMessageResponse)
-                .toList();
-    }
 
     @Transactional(readOnly = true)
     public ChatSession requireSession(UUID userId, UUID sessionId) {
@@ -171,20 +154,24 @@ public class ChatService {
     }
 
     public SseEmitter streamReply(UUID userId, UUID sessionId, String userContent) {
+        ChatTimingMetrics timing = new ChatTimingMetrics();
+        long prepStart = System.nanoTime();
+
         ChatSession session = requireSession(userId, sessionId);
         GitRepo repo = gitRepoService.requireOwned(session.getRepositoryId(), userId);
         if (repo.getIndexStatus() != IndexStatus.READY) {
             throw new BadRequestException("Repository is not ready for chat");
         }
 
-        // Cancel any existing active stream and persist interrupted state before reading history
+        // Cancel any existing active stream and persist interrupted state before
+        // reading history
         chatStreamHandler.stopStream(sessionId);
 
-        // 1. Fetch prior conversation history (latest 10 messages) before persisting the current question
+        // 1. Fetch prior conversation history (latest 10 messages) before persisting
+        // the current question
         List<ChatMessage> recentDesc = chatMessageRepository.findLatestMessages(
                 session.getId(),
-                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES)
-        );
+                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES));
         List<ChatMessage> priorMessages = new ArrayList<>(recentDesc.size());
         for (int i = recentDesc.size() - 1; i >= 0; i--) {
             priorMessages.add(recentDesc.get(i));
@@ -198,17 +185,27 @@ public class ChatService {
                 .content(userContent.trim())
                 .build());
 
+        timing.setPrepDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - prepStart));
+
         // 3. RAG retrieval — find code chunks similar to the question
         var retrievedContext = codeContextRetriever.retrieve(repo.getId(), userContent.trim());
+        timing.setRagMetrics(
+                retrievedContext.ragTotalDurationMs(),
+                retrievedContext.vectorSearchDurationMs(),
+                retrievedContext.neighborDurationMs()
+        );
 
         // 4. Build LLM messages including history + code context + question
+        long promptStart = System.nanoTime();
         List<Message> promptMessages = chatPromptBuilder.buildMessages(
                 repo.getFullName(),
                 priorMessages,
                 retrievedContext.contextText(),
                 userContent.trim());
+        timing.setPromptBuildDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - promptStart));
 
         // 5. Stream LLM response
+        ChatTimingContext.set(timing);
         return chatStreamHandler.stream(
                 session.getId(),
                 toMessageResponse(userMessage),
@@ -218,13 +215,17 @@ public class ChatService {
     }
 
     public SseEmitter streamRetry(UUID userId, UUID sessionId, UUID messageId) {
+        ChatTimingMetrics timing = new ChatTimingMetrics();
+        long prepStart = System.nanoTime();
+
         ChatSession session = requireSession(userId, sessionId);
         GitRepo repo = gitRepoService.requireOwned(session.getRepositoryId(), userId);
         if (repo.getIndexStatus() != IndexStatus.READY) {
             throw new BadRequestException("Repository is not ready for chat");
         }
 
-        // Cancel any existing active stream and persist interrupted state before reading messages
+        // Cancel any existing active stream and persist interrupted state before
+        // reading messages
         chatStreamHandler.stopStream(sessionId);
 
         ChatMessage targetMsg = chatMessageRepository.findByIdAndSessionId(messageId, session.getId())
@@ -239,25 +240,20 @@ public class ChatService {
                     session.getId(),
                     targetMsg.getCreatedAt(),
                     targetMsg.getId(),
-                    org.springframework.data.domain.PageRequest.of(0, 1)
-            );
+                    org.springframework.data.domain.PageRequest.of(0, 1));
             if (beforeAssistant.isEmpty() || beforeAssistant.get(0).getRole() != MessageRole.USER) {
                 throw new BadRequestException("Cannot find corresponding user message to retry");
             }
             userMsg = beforeAssistant.get(0);
         } else {
             userMsg = targetMsg;
-            List<ChatMessage> allAfter = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
-            int uIdx = -1;
-            for (int i = 0; i < allAfter.size(); i++) {
-                if (allAfter.get(i).getId().equals(userMsg.getId())) {
-                    uIdx = i;
-                    break;
-                }
-            }
-            if (uIdx != -1 && uIdx + 1 < allAfter.size()
-                    && allAfter.get(uIdx + 1).getRole() == MessageRole.ASSISTANT) {
-                assistantMsg = allAfter.get(uIdx + 1);
+            List<ChatMessage> nextMessages = chatMessageRepository.findMessagesAfter(
+                    session.getId(),
+                    userMsg.getCreatedAt(),
+                    userMsg.getId(),
+                    org.springframework.data.domain.PageRequest.of(0, 1));
+            if (!nextMessages.isEmpty() && nextMessages.get(0).getRole() == MessageRole.ASSISTANT) {
+                assistantMsg = nextMessages.get(0);
             }
         }
 
@@ -266,20 +262,30 @@ public class ChatService {
                 session.getId(),
                 userMsg.getCreatedAt(),
                 userMsg.getId(),
-                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES)
-        );
+                org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES));
         List<ChatMessage> historyMessages = new ArrayList<>(historyDesc.size());
         for (int i = historyDesc.size() - 1; i >= 0; i--) {
             historyMessages.add(historyDesc.get(i));
         }
 
+        timing.setPrepDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - prepStart));
+
         var retrievedContext = codeContextRetriever.retrieve(repo.getId(), userMsg.getContent());
+        timing.setRagMetrics(
+                retrievedContext.ragTotalDurationMs(),
+                retrievedContext.vectorSearchDurationMs(),
+                retrievedContext.neighborDurationMs()
+        );
+
+        long promptStart = System.nanoTime();
         List<Message> promptMessages = chatPromptBuilder.buildMessages(
                 repo.getFullName(),
                 historyMessages,
                 retrievedContext.contextText(),
                 userMsg.getContent());
+        timing.setPromptBuildDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - promptStart));
 
+        ChatTimingContext.set(timing);
         return chatStreamHandler.stream(
                 session.getId(),
                 toMessageResponse(userMsg),

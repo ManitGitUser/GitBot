@@ -130,7 +130,7 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## Current Limitations & Roadmap
-* **Chunk Line Tracking**: Code chunk start and end line metadata will be expanded in the next phase.
-* **Conversation History in LLM Context**: LLM chat context currently operates per-question; multi-turn conversation memory is slated for Phase 2.
-* **Database Migrations**: Uses Hibernate `ddl-auto: update` for MVP; Flyway migrations are prepared for production hardening.
+## Production Roadmap & Future Enhancements
+* **Extended Multi-Branch Context**: Deep cross-branch comparison and semantic merge conflict analysis.
+* **Granular Database Migrations**: Transition from Hibernate `ddl-auto: update` to formal Flyway versioned migrations for team-based schema evolution.
+* **Custom Model Providers**: Optional support for alternative local/cloud LLM providers via Spring AI abstraction.

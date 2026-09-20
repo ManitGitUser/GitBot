@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import com.example.gitbot.dto.BranchChatSessionRequest;
 import com.example.gitbot.dto.ChatMessageRequest;
-import com.example.gitbot.dto.ChatMessageResponse;
 import com.example.gitbot.dto.ChatSessionResponse;
 import com.example.gitbot.dto.CreateChatSessionRequest;
 import com.example.gitbot.dto.RenameChatSessionRequest;
@@ -49,16 +48,15 @@ public class ChatController {
     public com.example.gitbot.dto.PageResponse<ChatSessionResponse> listSessions(
             @RequestParam UUID repositoryId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         UUID userId = currentUser.require().getId();
-        return chatService.listSessions(userId, repositoryId, org.springframework.data.domain.PageRequest.of(page, size));
+        return chatService.listSessions(userId, repositoryId,
+                org.springframework.data.domain.PageRequest.of(page, size));
     }
 
     @GetMapping("/sessions/recent")
     public List<ChatSessionResponse> listRecentSessions(
-            @RequestParam(defaultValue = "10") int limit
-    ) {
+            @RequestParam(defaultValue = "10") int limit) {
         UUID userId = currentUser.require().getId();
         return chatService.listRecentSessions(userId, limit);
     }
@@ -67,8 +65,7 @@ public class ChatController {
     public com.example.gitbot.dto.PagedMessagesResponse getMessages(
             @PathVariable UUID id,
             @RequestParam(required = false) String before,
-            @RequestParam(defaultValue = "10") int limit
-    ) {
+            @RequestParam(defaultValue = "10") int limit) {
         UUID userId = currentUser.require().getId();
         return chatService.getMessages(userId, id, before, limit);
     }

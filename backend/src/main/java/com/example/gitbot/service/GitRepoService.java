@@ -10,11 +10,12 @@ import com.example.gitbot.enums.IndexStatus;
 import com.example.gitbot.exception.NotFoundException;
 import com.example.gitbot.repository.GitRepoRepository;
 import com.example.gitbot.service.github.GitHubApiClient;
-import com.example.gitbot.service.indexing.IndexingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,68 +27,40 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class GitRepoService {
 
     private final GitRepoRepository gitRepoRepository;
     private final UserService userService;
     private final GitHubApiClient gitHubApiClient;
-    private final IndexingService indexingService;
+    private final TransactionTemplate transactionTemplate;
+
+    public GitRepoService(
+            GitRepoRepository gitRepoRepository,
+            UserService userService,
+            GitHubApiClient gitHubApiClient
+    ) {
+        this(gitRepoRepository, userService, gitHubApiClient, (TransactionTemplate) null);
+    }
+
+    @Autowired
+    public GitRepoService(
+            GitRepoRepository gitRepoRepository,
+            UserService userService,
+            GitHubApiClient gitHubApiClient,
+            @Autowired(required = false) TransactionTemplate transactionTemplate
+    ) {
+        this.gitRepoRepository = gitRepoRepository;
+        this.userService = userService;
+        this.gitHubApiClient = gitHubApiClient;
+        this.transactionTemplate = transactionTemplate;
+    }
 
     private Long toLong(Object value) {
         if (value instanceof Number number) {
             return number.longValue();
         }
         return Long.parseLong(String.valueOf(value));
-    }
-
-    @Transactional
-    public List<GitRepoResponse> syncAndListGitRepos(UUID userId) {
-
-        User user = userService.getById(userId);
-        String token = userService.decryptAccessToken(user);
-        List<Map<String, Object>> remoteGitRepos = gitHubApiClient.listUserRepos(token);
-
-        List<GitRepo> saved = new ArrayList<>();
-
-        for (Map<String, Object> remote : remoteGitRepos) {
-
-            Long githubRepoId = toLong(remote.get("id"));
-            GitRepo repo = gitRepoRepository
-                    .findByUserIdAndGithubRepoId(userId, githubRepoId)
-                    .orElseGet(GitRepo::new);
-
-            String fullName = String.valueOf(remote.get("full_name"));
-            String[] parts = fullName.split("/", 2);
-
-            repo.setUserId(userId);
-            repo.setGithubRepoId(githubRepoId);
-            repo.setOwner(parts.length > 0 ? parts[0] : String.valueOf(remote.get("owner")));
-            repo.setName(parts.length > 1 ? parts[1] : String.valueOf(remote.get("name")));
-            repo.setFullName(fullName);
-            repo.setPrivate(Boolean.TRUE.equals(remote.get("private")));
-            repo.setDefaultBranch(remote.get("default_branch") != null
-                    ? String.valueOf(remote.get("default_branch"))
-                    : "main");
-            repo.setLanguage(remote.get("language") != null ? String.valueOf(remote.get("language")) : null);
-            repo.setHtmlUrl(remote.get("html_url") != null ? String.valueOf(remote.get("html_url")) : null);
-            repo.setDescription(remote.get("description") != null ? String.valueOf(remote.get("description")) : null);
-            repo.setUpdatedAt(Instant.now());
-            if (repo.getOwner() == null || repo.getOwner().isBlank()) {
-                Object ownerObj = remote.get("owner");
-                if (ownerObj instanceof Map<?, ?> ownerMap && ownerMap.get("login") != null) {
-                    repo.setOwner(String.valueOf(ownerMap.get("login")));
-                }
-            }
-
-            saved.add(gitRepoRepository.save(repo));
-        }
-
-        return saved.stream()
-                .sorted((a, b) -> a.getFullName().compareToIgnoreCase(b.getFullName()))
-                .map(this::toResponse)
-                .toList();
     }
 
     public GitRepoResponse toResponse(GitRepo gitRepo) {
@@ -138,8 +111,7 @@ public class GitRepoService {
                     false,
                     "Repository is already up to date.",
                     currentSha,
-                    indexedSha
-            );
+                    indexedSha);
         }
 
         if (currentSha == null) {
@@ -148,8 +120,7 @@ public class GitRepoService {
                     false,
                     "Repository is empty or has no commits.",
                     null,
-                    indexedSha
-            );
+                    indexedSha);
         }
 
         return new SyncRepoResponse(
@@ -157,27 +128,29 @@ public class GitRepoService {
                 false,
                 "New commit available. Click Index to update.",
                 currentSha,
-                indexedSha
-        );
+                indexedSha);
     }
 
-    @Transactional
+    private record DiscoveredRepo(
+            Long githubRepoId,
+            String fullName,
+            String owner,
+            String name,
+            boolean isPrivate,
+            String defaultBranch,
+            String language,
+            String htmlUrl,
+            String description,
+            String latestSha
+    ) {}
+
     public SyncAllReposResponse syncAllRepos(UUID userId) {
+        // Phase A — outside DB transaction: GitHub I/O and in-memory preparation
         User user = userService.getById(userId);
         String token = userService.decryptAccessToken(user);
         List<Map<String, Object>> remoteGitRepos = gitHubApiClient.listUserRepos(token);
 
-        List<GitRepo> existingRepos = gitRepoRepository.findByUserId(userId);
-        Map<Long, GitRepo> existingMap = existingRepos.stream()
-                .filter(r -> r.getGithubRepoId() != null)
-                .collect(Collectors.toMap(GitRepo::getGithubRepoId, Function.identity(), (a, b) -> a));
-
-        int totalRepositories = remoteGitRepos.size();
-        int newRepositories = 0;
-        int updatedRepositories = 0;
-        int unchangedRepositories = 0;
-        int repositoriesWithNewCommits = 0;
-
+        List<DiscoveredRepo> discoveredRepos = new ArrayList<>(remoteGitRepos.size());
         for (Map<String, Object> remote : remoteGitRepos) {
             Long githubRepoId = toLong(remote.get("id"));
             String fullName = String.valueOf(remote.get("full_name"));
@@ -205,21 +178,56 @@ public class GitRepoService {
                 log.warn("Could not fetch latest commit SHA for {}/{}: {}", owner, name, ex.getMessage());
             }
 
-            GitRepo repo = existingMap.get(githubRepoId);
+            discoveredRepos.add(new DiscoveredRepo(
+                    githubRepoId,
+                    fullName,
+                    owner,
+                    name,
+                    isPrivate,
+                    defaultBranch,
+                    language,
+                    htmlUrl,
+                    description,
+                    latestSha
+            ));
+        }
+
+        // Phase B — short database transaction: load existing repositories, upsert/persist state
+        if (transactionTemplate != null) {
+            return transactionTemplate.execute(status -> persistSyncState(userId, discoveredRepos));
+        } else {
+            return persistSyncState(userId, discoveredRepos);
+        }
+    }
+
+    private SyncAllReposResponse persistSyncState(UUID userId, List<DiscoveredRepo> discoveredRepos) {
+        List<GitRepo> existingRepos = gitRepoRepository.findByUserId(userId);
+        Map<Long, GitRepo> existingMap = existingRepos.stream()
+                .filter(r -> r.getGithubRepoId() != null)
+                .collect(Collectors.toMap(GitRepo::getGithubRepoId, Function.identity(), (a, b) -> a));
+
+        int totalRepositories = discoveredRepos.size();
+        int newRepositories = 0;
+        int updatedRepositories = 0;
+        int unchangedRepositories = 0;
+        int repositoriesWithNewCommits = 0;
+
+        for (DiscoveredRepo discovered : discoveredRepos) {
+            GitRepo repo = existingMap.get(discovered.githubRepoId());
             if (repo == null) {
                 newRepositories++;
                 GitRepo newRepo = GitRepo.builder()
                         .userId(userId)
-                        .githubRepoId(githubRepoId)
-                        .owner(owner)
-                        .name(name)
-                        .fullName(fullName)
-                        .isPrivate(isPrivate)
-                        .defaultBranch(defaultBranch)
-                        .language(language)
-                        .htmlUrl(htmlUrl)
-                        .description(description)
-                        .latestCommitSha(latestSha)
+                        .githubRepoId(discovered.githubRepoId())
+                        .owner(discovered.owner())
+                        .name(discovered.name())
+                        .fullName(discovered.fullName())
+                        .isPrivate(discovered.isPrivate())
+                        .defaultBranch(discovered.defaultBranch())
+                        .language(discovered.language())
+                        .htmlUrl(discovered.htmlUrl())
+                        .description(discovered.description())
+                        .latestCommitSha(discovered.latestSha())
                         .indexedCommitSha(null)
                         .indexStatus(IndexStatus.PENDING)
                         .chunkCount(0)
@@ -227,50 +235,50 @@ public class GitRepoService {
                         .filesProcessed(0)
                         .build();
 
-                if (latestSha != null) {
+                if (discovered.latestSha() != null) {
                     repositoriesWithNewCommits++;
                 }
                 gitRepoRepository.save(newRepo);
             } else {
-                if (latestSha != null && !Objects.equals(latestSha, repo.getIndexedCommitSha())) {
+                if (discovered.latestSha() != null && !Objects.equals(discovered.latestSha(), repo.getIndexedCommitSha())) {
                     repositoriesWithNewCommits++;
                 }
 
                 boolean changed = false;
-                if (!Objects.equals(repo.getLatestCommitSha(), latestSha)) {
-                    repo.setLatestCommitSha(latestSha);
+                if (!Objects.equals(repo.getLatestCommitSha(), discovered.latestSha())) {
+                    repo.setLatestCommitSha(discovered.latestSha());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getOwner(), owner)) {
-                    repo.setOwner(owner);
+                if (!Objects.equals(repo.getOwner(), discovered.owner())) {
+                    repo.setOwner(discovered.owner());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getName(), name)) {
-                    repo.setName(name);
+                if (!Objects.equals(repo.getName(), discovered.name())) {
+                    repo.setName(discovered.name());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getFullName(), fullName)) {
-                    repo.setFullName(fullName);
+                if (!Objects.equals(repo.getFullName(), discovered.fullName())) {
+                    repo.setFullName(discovered.fullName());
                     changed = true;
                 }
-                if (repo.isPrivate() != isPrivate) {
-                    repo.setPrivate(isPrivate);
+                if (repo.isPrivate() != discovered.isPrivate()) {
+                    repo.setPrivate(discovered.isPrivate());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getDefaultBranch(), defaultBranch)) {
-                    repo.setDefaultBranch(defaultBranch);
+                if (!Objects.equals(repo.getDefaultBranch(), discovered.defaultBranch())) {
+                    repo.setDefaultBranch(discovered.defaultBranch());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getLanguage(), language)) {
-                    repo.setLanguage(language);
+                if (!Objects.equals(repo.getLanguage(), discovered.language())) {
+                    repo.setLanguage(discovered.language());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getHtmlUrl(), htmlUrl)) {
-                    repo.setHtmlUrl(htmlUrl);
+                if (!Objects.equals(repo.getHtmlUrl(), discovered.htmlUrl())) {
+                    repo.setHtmlUrl(discovered.htmlUrl());
                     changed = true;
                 }
-                if (!Objects.equals(repo.getDescription(), description)) {
-                    repo.setDescription(description);
+                if (!Objects.equals(repo.getDescription(), discovered.description())) {
+                    repo.setDescription(discovered.description());
                     changed = true;
                 }
 
@@ -289,8 +297,7 @@ public class GitRepoService {
                 newRepositories,
                 updatedRepositories,
                 unchangedRepositories,
-                repositoriesWithNewCommits
-        );
+                repositoriesWithNewCommits);
     }
 
     @Transactional(readOnly = true)
@@ -318,18 +325,6 @@ public class GitRepoService {
                 .orElseThrow(() -> new NotFoundException("Repository not found"));
     }
 
-    @Transactional(readOnly = true)
-    public List<GitRepoResponse> listStored(UUID userId) {
-        return gitRepoRepository.findByUserIdOrderByFullNameAsc(userId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public com.example.gitbot.dto.PageResponse<GitRepoResponse> listStored(UUID userId, org.springframework.data.domain.Pageable pageable) {
-        return listStored(userId, null, null, null, pageable);
-    }
 
     @Transactional(readOnly = true)
     public com.example.gitbot.dto.PageResponse<GitRepoResponse> listStored(
@@ -337,8 +332,7 @@ public class GitRepoService {
             String status,
             String visibility,
             String search,
-            org.springframework.data.domain.Pageable pageable
-    ) {
+            org.springframework.data.domain.Pageable pageable) {
         Boolean isPrivate = null;
         if ("private".equalsIgnoreCase(visibility)) {
             isPrivate = true;
@@ -357,8 +351,7 @@ public class GitRepoService {
         String query = (search != null && !search.isBlank()) ? search.trim() : null;
 
         org.springframework.data.domain.Page<GitRepo> page = gitRepoRepository.findWithFilters(
-                userId, isPrivate, indexStatus, query, pageable
-        );
+                userId, isPrivate, indexStatus, query, pageable);
         return com.example.gitbot.dto.PageResponse.of(page.map(this::toResponse));
     }
 }

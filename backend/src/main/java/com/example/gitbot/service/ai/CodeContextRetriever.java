@@ -3,6 +3,7 @@ package com.example.gitbot.service.ai;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -119,11 +120,8 @@ public class CodeContextRetriever {
         this.maxNeighboringChunks = Math.max(0, maxNeighboringChunks);
     }
 
-    public CodeContextRetriever(VectorStore vectorStore, CitationMapper citationMapper) {
-        this(vectorStore, citationMapper, null, null, 10, 12000, false, 0);
-    }
-
     public RetrievedContextDto retrieve(UUID repositoryId, String question) {
+        long ragStart = System.nanoTime();
         String normalizedQuestion = normalizeQuery(question);
         if (normalizedQuestion.isBlank()) {
             return new RetrievedContextDto(List.of(), NO_MATCHES);
@@ -140,7 +138,9 @@ public class CodeContextRetriever {
                 .filterExpression(filter)
                 .build();
 
+        long vectorSearchStart = System.nanoTime();
         List<Document> rawVectorResults = vectorStore.similaritySearch(search);
+        long vectorSearchDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - vectorSearchStart);
         if (rawVectorResults == null) {
             rawVectorResults = List.of();
         }
@@ -159,7 +159,8 @@ public class CodeContextRetriever {
         }
 
         if (primaryDocs.isEmpty()) {
-            return new RetrievedContextDto(List.of(), NO_MATCHES);
+            long ragTotalDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
+            return new RetrievedContextDto(List.of(), NO_MATCHES, vectorSearchDurationMs, 0, ragTotalDurationMs);
         }
 
         // 3. Process primary results with Highest-Rank Guarantee & Context Budget
@@ -201,8 +202,11 @@ public class CodeContextRetriever {
 
         // 4. Retrieve adjacent neighboring chunks only if space remains
         List<Document> acceptedNeighbors = new ArrayList<>();
+        long neighborDurationMs = 0;
         if (enableNeighboring && jdbcTemplate != null && currentBudgetUsed < maxContextChars) {
+            long neighborStart = System.nanoTime();
             List<Document> candidateNeighbors = findNeighborChunks(repositoryId, acceptedPrimaryDocs, seenKeys);
+            neighborDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - neighborStart);
             for (Document neighbor : candidateNeighbors) {
                 if (acceptedNeighbors.size() >= maxNeighboringChunks) {
                     break;
@@ -238,7 +242,8 @@ public class CodeContextRetriever {
             contextText = NO_MATCHES;
         }
 
-        return new RetrievedContextDto(citations, contextText);
+        long ragTotalDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
+        return new RetrievedContextDto(citations, contextText, vectorSearchDurationMs, neighborDurationMs, ragTotalDurationMs);
     }
 
     String normalizeQuery(String question) {
@@ -321,18 +326,24 @@ public class CodeContextRetriever {
         return text;
     }
 
+    private record NeighborTarget(String filePath, int chunkIndex) {}
+
     private List<Document> findNeighborChunks(UUID repositoryId, List<Document> primaryDocs, Set<ChunkKey> seenKeys) {
         if (primaryDocs.isEmpty() || jdbcTemplate == null) {
             return List.of();
         }
 
-        List<Document> neighbors = new ArrayList<>();
         // Inspect top 2 primary documents for adjacent candidates
         int inspectCount = Math.min(2, primaryDocs.size());
+        List<NeighborTarget> targets = new ArrayList<>(4);
+        Set<NeighborTarget> candidateSeen = new HashSet<>();
 
         for (int i = 0; i < inspectCount; i++) {
             Document doc = primaryDocs.get(i);
             var meta = doc.getMetadata();
+            if (meta == null) {
+                continue;
+            }
             String filePath = meta.get("filePath") != null ? String.valueOf(meta.get("filePath")) : null;
             Object idxObj = meta.get("chunkIndex");
 
@@ -355,31 +366,78 @@ public class CodeContextRetriever {
             int nextIdx = chunkIndex + 1;
 
             if (prevIdx >= 0 && !seenKeys.contains(new ChunkKey(repositoryId.toString(), filePath, prevIdx))) {
-                fetchChunkBySql(repositoryId, filePath, prevIdx).ifPresent(neighbors::add);
+                NeighborTarget t = new NeighborTarget(filePath, prevIdx);
+                if (candidateSeen.add(t)) {
+                    targets.add(t);
+                }
             }
             if (!seenKeys.contains(new ChunkKey(repositoryId.toString(), filePath, nextIdx))) {
-                fetchChunkBySql(repositoryId, filePath, nextIdx).ifPresent(neighbors::add);
+                NeighborTarget t = new NeighborTarget(filePath, nextIdx);
+                if (candidateSeen.add(t)) {
+                    targets.add(t);
+                }
             }
         }
 
-        return neighbors;
+        if (targets.isEmpty()) {
+            return List.of();
+        }
+
+        return fetchNeighborChunksBatched(repositoryId, targets);
     }
 
-    private Optional<Document> fetchChunkBySql(UUID repositoryId, String filePath, int chunkIndex) {
+    private List<Document> fetchNeighborChunksBatched(UUID repositoryId, List<NeighborTarget> targets) {
         try {
-            String sql = """
+            StringBuilder sql = new StringBuilder("""
                     SELECT content, metadata FROM vector_store
                     WHERE metadata->>'repoId' = ?
-                      AND metadata->>'filePath' = ?
-                      AND (metadata->>'chunkIndex')::int = ?
-                    LIMIT 1
-                    """;
-            List<Document> docs = jdbcTemplate.query(sql, (rs, rowNum) -> mapRowToDocument(rs),
-                    repositoryId.toString(), filePath, chunkIndex);
-            return docs.isEmpty() ? Optional.empty() : Optional.of(docs.get(0));
+                      AND (
+                    """);
+            List<Object> params = new ArrayList<>();
+            params.add(repositoryId.toString());
+
+            for (int i = 0; i < targets.size(); i++) {
+                if (i > 0) {
+                    sql.append(" OR ");
+                }
+                sql.append("(metadata->>'filePath' = ? AND (metadata->>'chunkIndex')::int = ?)");
+                params.add(targets.get(i).filePath());
+                params.add(targets.get(i).chunkIndex());
+            }
+            sql.append(")");
+
+            List<Document> docs = jdbcTemplate.query(
+                    sql.toString(),
+                    (rs, rowNum) -> mapRowToDocument(rs),
+                    params.toArray()
+            );
+
+            Map<NeighborTarget, Document> fetchedMap = new HashMap<>();
+            for (Document doc : docs) {
+                var meta = doc.getMetadata();
+                if (meta != null) {
+                    String fp = meta.get("filePath") != null ? String.valueOf(meta.get("filePath")) : null;
+                    Object idx = meta.get("chunkIndex");
+                    if (fp != null && idx != null) {
+                        try {
+                            int ci = (idx instanceof Number n) ? n.intValue() : Integer.parseInt(idx.toString());
+                            fetchedMap.put(new NeighborTarget(fp, ci), doc);
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+            }
+
+            List<Document> orderedNeighbors = new ArrayList<>(targets.size());
+            for (NeighborTarget target : targets) {
+                Document doc = fetchedMap.get(target);
+                if (doc != null) {
+                    orderedNeighbors.add(doc);
+                }
+            }
+            return orderedNeighbors;
         } catch (Exception ex) {
-            log.debug("Could not fetch neighbor chunk for {} (idx {}): {}", filePath, chunkIndex, ex.getMessage());
-            return Optional.empty();
+            log.debug("Could not fetch neighbor chunks in batch for repo {}: {}", repositoryId, ex.getMessage());
+            return List.of();
         }
     }
 

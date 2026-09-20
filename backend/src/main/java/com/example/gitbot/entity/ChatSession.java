@@ -16,7 +16,10 @@ import lombok.*;
 @Entity
 @Table(
         name = "chat_sessions",
-        indexes = @Index(name = "idx_chat_sessions_user_repo_created", columnList = "user_id, repository_id, created_at DESC")
+        indexes = {
+                @Index(name = "idx_chat_sessions_user_repo_created", columnList = "user_id, repository_id, created_at DESC"),
+                @Index(name = "idx_chat_sessions_user_created", columnList = "user_id, created_at DESC")
+        }
 )
 @Data
 @NoArgsConstructor

@@ -11,10 +11,6 @@ import java.util.List;
 
 public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
 
-    List<GitRepo> findByUserIdOrderByFullNameAsc(UUID userId);
-
-    Page<GitRepo> findByUserIdOrderByFullNameAsc(UUID userId, Pageable pageable);
-
     List<GitRepo> findByUserId(UUID userId);
 
     Optional<GitRepo> findByIdAndUserId(UUID id, UUID userId);

@@ -244,9 +244,7 @@ export const api = {
     csrf: () => apiFetch<{ token: string; headerName: string; parameterName: string }>("/api/auth/csrf"),
     me: async () => {
         const raw = await apiFetch<User & { avatar_url?: string }>("/api/auth/me");
-        console.log("[GitBot Avatar] api.me raw response:", raw);
         const mappedUrl = cleanAvatarUrl(raw.avatarUrl || raw.avatar_url);
-        console.log("[GitBot Avatar] api.me mapped avatarUrl:", mappedUrl);
         return {
             ...raw,
             avatarUrl: mappedUrl,

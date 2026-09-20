@@ -1,5 +1,6 @@
 package com.example.gitbot.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,6 +11,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -47,8 +49,14 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, message);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException e) {
+        return error(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<?> handleGenericException(Exception e) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage() !=  null ? e.getMessage() : "Unexpected Error");
+        log.error("Unhandled exception occurred: ", e);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred.");
     }
 }

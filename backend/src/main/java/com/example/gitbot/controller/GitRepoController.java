@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,13 +31,13 @@ public class GitRepoController {
             @RequestParam(name = "size", defaultValue = "10") int size,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "visibility", required = false) String visibility,
-            @RequestParam(name = "search", required = false) String search
-    ) {
+            @RequestParam(name = "search", required = false) String search) {
         UUID userId = currentUser.require().getId();
         if (refresh) {
-            gitRepoService.syncAndListGitRepos(userId);
+            gitRepoService.syncAllRepos(userId);
         }
-        return gitRepoService.listStored(userId, status, visibility, search, org.springframework.data.domain.PageRequest.of(page, size));
+        return gitRepoService.listStored(userId, status, visibility, search,
+                org.springframework.data.domain.PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
@@ -50,7 +49,7 @@ public class GitRepoController {
     @GetMapping("/{id}/status")
     public IndexStatusResponse status(@PathVariable UUID id) {
         UUID userId = currentUser.require().getId();
-        return gitRepoService.status(userId, id);
+        return gitRepoService.status(id, userId);
     }
 
     @PostMapping("/{id}/index")

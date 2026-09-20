@@ -16,6 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -236,5 +240,32 @@ class SyncAllReposTest {
         GitRepo saved = captor.getValue();
         assertThat(saved.getLatestCommitSha()).isNull();
         assertThat(saved.getIndexedCommitSha()).isNull();
+    }
+
+    @Test
+    @DisplayName("Test 6 — Sync All: executes persistence inside TransactionTemplate when configured")
+    void test6_syncAllRepos_executesInsideTransactionTemplate_whenConfigured() {
+        TransactionTemplate mockTxTemplate = mock(TransactionTemplate.class);
+        when(mockTxTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+
+        GitRepoService serviceWithTx = new GitRepoService(
+                gitRepoRepository,
+                userService,
+                gitHubApiClient,
+                mockTxTemplate
+        );
+
+        when(userService.getById(userId)).thenReturn(user);
+        when(userService.decryptAccessToken(user)).thenReturn("raw_token");
+        when(gitHubApiClient.listUserRepos("raw_token")).thenReturn(List.of());
+        when(gitRepoRepository.findByUserId(userId)).thenReturn(Collections.emptyList());
+
+        SyncAllReposResponse response = serviceWithTx.syncAllRepos(userId);
+
+        assertThat(response.totalRepositories()).isEqualTo(0);
+        verify(mockTxTemplate).execute(any());
     }
 }

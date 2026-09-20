@@ -173,12 +173,17 @@ class CodeContextRetrieverTest {
         Document primaryDoc = createDoc(repoA, "src/Service.java", 5, 50, 70, "java", "void doWork() {}");
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(primaryDoc));
 
-        // Mock SQL response for neighbor chunkIndex 4 and 6
+        // Mock SQL response for batched neighbor query (chunkIndex 4 and 6)
         Document neighborDoc = createDoc(repoA, "src/Service.java", 6, 71, 90, "java", "void doMoreWork() {}");
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(repoA.toString()), eq("src/Service.java"), eq(4)))
-                .thenReturn(List.of());
-        when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq(repoA.toString()), eq("src/Service.java"), eq(6)))
-                .thenReturn(List.of(neighborDoc));
+        when(jdbcTemplate.query(
+                anyString(),
+                any(RowMapper.class),
+                eq(repoA.toString()),
+                eq("src/Service.java"),
+                eq(4),
+                eq("src/Service.java"),
+                eq(6)
+        )).thenReturn(List.of(neighborDoc));
 
         RetrievedContextDto result = retriever.retrieve(repoA, "doWork");
 

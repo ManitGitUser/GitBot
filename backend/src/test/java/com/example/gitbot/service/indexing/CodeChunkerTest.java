@@ -21,13 +21,13 @@ class CodeChunkerTest {
 
     @Test
     void testEmptyFile() {
-        assertThat(chunker.chunkFile("repo-1", "App.java", "")).isEmpty();
-        assertThat(chunker.chunkFile("repo-1", "App.java", null)).isEmpty();
+        assertThat(chunker.chunkFile("repo-1", "owner/repo", "App.java", "", "run-1")).isEmpty();
+        assertThat(chunker.chunkFile("repo-1", "owner/repo", "App.java", null, "run-1")).isEmpty();
     }
 
     @Test
     void testWhitespaceOnlyFile() {
-        assertThat(chunker.chunkFile("repo-1", "App.java", "   \n\n\t  \r\n  ")).isEmpty();
+        assertThat(chunker.chunkFile("repo-1", "owner/repo", "App.java", "   \n\n\t  \r\n  ", "run-1")).isEmpty();
     }
 
     @Test

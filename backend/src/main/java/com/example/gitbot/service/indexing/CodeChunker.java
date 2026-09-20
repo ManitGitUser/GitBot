@@ -97,18 +97,6 @@ public class CodeChunker {
         this.chunkOverlap = Math.max(0, Math.min(chunkOverlap, this.chunkSize / 2));
     }
 
-    public CodeChunker(CodeFileFilter fileFilter, int chunkSize) {
-        this(fileFilter, chunkSize, 100);
-    }
-
-    public List<Document> chunkFile(String repoId, String filePath, String content) {
-        return chunkFile(repoId, null, filePath, content, null);
-    }
-
-    public List<Document> chunkFile(String repoId, String repoFullName, String filePath, String content) {
-        return chunkFile(repoId, repoFullName, filePath, content, null);
-    }
-
     public List<Document> chunkFile(
             String repoId,
             String repoFullName,

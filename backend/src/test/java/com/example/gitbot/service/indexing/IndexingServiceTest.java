@@ -140,7 +140,7 @@ class IndexingServiceTest {
 
         // Failed status is recorded
         verify(progressService).markFailed(eq(repoId), anyString());
-        verify(progressService, never()).markReady(any(), anyInt(), anyInt(), anyInt(), any());
+        verify(progressService, never()).markReady(any(), anyInt(), anyInt(), anyInt(), any(), any());
 
         // Vector store delete is called to clean up the current run
         verify(vectorStore).delete(any(Filter.Expression.class));

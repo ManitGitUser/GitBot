@@ -3,9 +3,11 @@ package com.example.gitbot.service.ai;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.example.gitbot.dto.ChatMessageResponse;
+import com.example.gitbot.dto.ChatTimingMetrics;
 import com.example.gitbot.dto.CitationDto;
 import com.example.gitbot.entity.ChatMessage;
 import com.example.gitbot.enums.MessageRole;
@@ -44,22 +46,26 @@ public class ChatStreamHandler {
         final StringBuilder fullReply = new StringBuilder();
         final List<CitationDto> citations;
         final UUID targetAssistantMessageId;
+        final ChatTimingMetrics timing;
         final AtomicBoolean completed = new AtomicBoolean(false);
         final AtomicBoolean stopped = new AtomicBoolean(false);
         volatile Disposable subscription;
 
-        ActiveChatStream(UUID sessionId, SseEmitter emitter, List<CitationDto> citations, UUID targetAssistantMessageId) {
+        ActiveChatStream(
+                UUID sessionId,
+                SseEmitter emitter,
+                List<CitationDto> citations,
+                UUID targetAssistantMessageId,
+                ChatTimingMetrics timing
+        ) {
             this.sessionId = sessionId;
             this.emitter = emitter;
             this.citations = citations;
             this.targetAssistantMessageId = targetAssistantMessageId;
+            this.timing = timing;
         }
     }
 
-    public boolean isStreamActive(UUID sessionId) {
-        ActiveChatStream active = activeStreams.get(sessionId);
-        return active != null && !active.completed.get() && !active.stopped.get();
-    }
 
     public SseEmitter stream(
             UUID sessionId,
@@ -68,11 +74,18 @@ public class ChatStreamHandler {
             List<Message> messages,
             UUID targetAssistantMessageId
     ) {
+        ChatTimingMetrics timing = com.example.gitbot.dto.ChatTimingContext.get();
+        com.example.gitbot.dto.ChatTimingContext.clear();
+
         // Cancel any existing active stream for this session
         stopStream(sessionId);
 
+        if (timing != null) {
+            timing.markStreamStart();
+        }
+
         SseEmitter emitter = new SseEmitter(RagSettings.STREAM_TIMEOUT_MS);
-        ActiveChatStream activeStream = new ActiveChatStream(sessionId, emitter, citations, targetAssistantMessageId);
+        ActiveChatStream activeStream = new ActiveChatStream(sessionId, emitter, citations, targetAssistantMessageId, timing);
         activeStreams.put(sessionId, activeStream);
 
         emitter.onCompletion(() -> activeStreams.remove(sessionId, activeStream));
@@ -144,6 +157,9 @@ public class ChatStreamHandler {
         if (stream.stopped.get() || stream.completed.get()) {
             return;
         }
+        if (stream.timing != null) {
+            stream.timing.markFirstToken();
+        }
         stream.fullReply.append(token);
         try {
             stream.emitter.send(
@@ -170,6 +186,7 @@ public class ChatStreamHandler {
             String fullReply = stream.fullReply.toString();
             List<CitationDto> supporting = citationMapper.filterSupportingCitations(fullReply, stream.citations);
 
+            long persistStart = System.nanoTime();
             ChatMessage assistant = persistAssistantMessage(
                     stream.sessionId,
                     stream.targetAssistantMessageId,
@@ -177,6 +194,24 @@ public class ChatStreamHandler {
                     supporting,
                     MessageStatus.COMPLETE
             );
+            long persistMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - persistStart);
+
+            if (stream.timing != null) {
+                long streamMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - stream.timing.getStreamStartNanos());
+                stream.timing.setStreamTotalDurationMs(streamMs);
+                stream.timing.setPersistenceDurationMs(persistMs);
+                log.info("Chat stream completed for session {}: prep={}ms, rag={}ms (vectorSearch={}ms, neighborRetrieval={}ms), prompt={}ms, ttft={}ms, stream={}ms, persistence={}ms, totalLatency={}ms",
+                        stream.sessionId,
+                        stream.timing.getPrepDurationMs(),
+                        stream.timing.getRagTotalDurationMs(),
+                        stream.timing.getVectorSearchDurationMs(),
+                        stream.timing.getNeighborDurationMs(),
+                        stream.timing.getPromptBuildDurationMs(),
+                        stream.timing.getTimeToFirstTokenMs(),
+                        stream.timing.getStreamTotalDurationMs(),
+                        stream.timing.getPersistenceDurationMs(),
+                        stream.timing.getTotalLatencyMs());
+            }
 
             stream.emitter.send(
                     SseEmitter.event()
@@ -205,6 +240,7 @@ public class ChatStreamHandler {
         try {
             String partial = stream.fullReply.toString();
             List<CitationDto> supporting = citationMapper.filterSupportingCitations(partial, stream.citations);
+            long persistStart = System.nanoTime();
             ChatMessage assistant = persistAssistantMessage(
                     stream.sessionId,
                     stream.targetAssistantMessageId,
@@ -212,6 +248,24 @@ public class ChatStreamHandler {
                     supporting,
                     MessageStatus.INTERRUPTED
             );
+            long persistMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - persistStart);
+
+            if (stream.timing != null) {
+                long streamMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - stream.timing.getStreamStartNanos());
+                stream.timing.setStreamTotalDurationMs(streamMs);
+                stream.timing.setPersistenceDurationMs(persistMs);
+                log.info("Chat stream interrupted for session {}: prep={}ms, rag={}ms (vectorSearch={}ms, neighborRetrieval={}ms), prompt={}ms, ttft={}ms, stream={}ms, persistence={}ms, totalLatency={}ms",
+                        stream.sessionId,
+                        stream.timing.getPrepDurationMs(),
+                        stream.timing.getRagTotalDurationMs(),
+                        stream.timing.getVectorSearchDurationMs(),
+                        stream.timing.getNeighborDurationMs(),
+                        stream.timing.getPromptBuildDurationMs(),
+                        stream.timing.getTimeToFirstTokenMs(),
+                        stream.timing.getStreamTotalDurationMs(),
+                        stream.timing.getPersistenceDurationMs(),
+                        stream.timing.getTotalLatencyMs());
+            }
 
             try {
                 stream.emitter.send(
@@ -237,6 +291,7 @@ public class ChatStreamHandler {
         }
         try {
             String partial = stream.fullReply.toString();
+            long persistStart = System.nanoTime();
             ChatMessage assistant = persistAssistantMessage(
                     stream.sessionId,
                     stream.targetAssistantMessageId,
@@ -244,6 +299,25 @@ public class ChatStreamHandler {
                     List.of(),
                     MessageStatus.FAILED
             );
+            long persistMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - persistStart);
+
+            if (stream.timing != null) {
+                long streamMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - stream.timing.getStreamStartNanos());
+                stream.timing.setStreamTotalDurationMs(streamMs);
+                stream.timing.setPersistenceDurationMs(persistMs);
+                log.info("Chat stream failed for session {}: prep={}ms, rag={}ms (vectorSearch={}ms, neighborRetrieval={}ms), prompt={}ms, ttft={}ms, stream={}ms, persistence={}ms, totalLatency={}ms, error={}",
+                        stream.sessionId,
+                        stream.timing.getPrepDurationMs(),
+                        stream.timing.getRagTotalDurationMs(),
+                        stream.timing.getVectorSearchDurationMs(),
+                        stream.timing.getNeighborDurationMs(),
+                        stream.timing.getPromptBuildDurationMs(),
+                        stream.timing.getTimeToFirstTokenMs(),
+                        stream.timing.getStreamTotalDurationMs(),
+                        stream.timing.getPersistenceDurationMs(),
+                        stream.timing.getTotalLatencyMs(),
+                        err.getMessage());
+            }
 
             try {
                 stream.emitter.send(

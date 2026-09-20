@@ -334,4 +334,31 @@ class ChatServiceTest {
 
         verify(chatStreamHandler).stream(eq(sessionId), any(), any(), any(), eq(targetAssistant.getId()));
     }
+
+    @Test
+    void streamRetry_whenRetryingUserMessage_usesBoundedFindMessagesAfter() {
+        Instant t0 = Instant.now().minusSeconds(10);
+        Instant t1 = Instant.now().minusSeconds(5);
+
+        ChatMessage userMsg = ChatMessage.builder().id(UUID.randomUUID()).sessionId(sessionId).role(MessageRole.USER).content("User Q").createdAt(t0).build();
+        ChatMessage nextAssistant = ChatMessage.builder().id(UUID.randomUUID()).sessionId(sessionId).role(MessageRole.ASSISTANT).status(MessageStatus.COMPLETE).content("Old A").createdAt(t1).build();
+
+        when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
+        when(chatMessageRepository.findByIdAndSessionId(userMsg.getId(), sessionId)).thenReturn(Optional.of(userMsg));
+        when(chatMessageRepository.findMessagesAfter(eq(sessionId), eq(userMsg.getCreatedAt()), eq(userMsg.getId()), eq(org.springframework.data.domain.PageRequest.of(0, 1))))
+                .thenReturn(List.of(nextAssistant));
+        when(chatMessageRepository.findMessagesBefore(eq(sessionId), eq(userMsg.getCreatedAt()), eq(userMsg.getId()), eq(org.springframework.data.domain.PageRequest.of(0, ChatPromptBuilder.MAX_HISTORY_MESSAGES))))
+                .thenReturn(List.of());
+        when(codeContextRetriever.retrieve(repoId, "User Q")).thenReturn(new RetrievedContextDto(List.of(), "code snippet"));
+        when(chatPromptBuilder.buildMessages(eq(repo.getFullName()), any(), eq("code snippet"), eq("User Q"))).thenReturn(List.of());
+        when(chatStreamHandler.stream(eq(sessionId), any(), any(), any(), eq(nextAssistant.getId()))).thenReturn(new SseEmitter());
+
+        SseEmitter emitter = chatService.streamRetry(userId, sessionId, userMsg.getId());
+        assertThat(emitter).isNotNull();
+
+        verify(chatMessageRepository).findMessagesAfter(eq(sessionId), eq(userMsg.getCreatedAt()), eq(userMsg.getId()), eq(org.springframework.data.domain.PageRequest.of(0, 1)));
+        verify(chatMessageRepository, never()).findBySessionIdOrderByCreatedAtAsc(any());
+        verify(chatStreamHandler).stream(eq(sessionId), any(), any(), any(), eq(nextAssistant.getId()));
+    }
 }

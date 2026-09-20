@@ -108,9 +108,6 @@ public class GitHubApiClient {
         return String.valueOf(content);
     }
 
-    public String getFileContent(String accessToken, String owner, String repo, String path) {
-        return getFileContent(accessToken, owner, repo, path, null);
-    }
 
     public Map<String, Object> getCurrentUserProfile(String accessToken) {
         return client(accessToken)

@@ -67,7 +67,6 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/health",
                                 "/api/auth/csrf",
-                                "/api/auth/login-url",
                                 "/api/public/shares/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**",

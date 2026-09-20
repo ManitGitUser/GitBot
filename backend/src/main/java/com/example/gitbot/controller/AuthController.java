@@ -28,11 +28,6 @@ public class AuthController {
     private final CurrentUser currUser;
     private final UserService userServ;
 
-    @GetMapping("/login-url")
-    public Map<String, String> loginUrl() {
-        return Map.of("url", "/oauth2/authorization/github");
-    }
-
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me() {
         AppUserPrincipal principal = currUser.require();

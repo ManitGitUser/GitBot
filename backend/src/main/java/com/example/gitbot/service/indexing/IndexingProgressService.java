@@ -62,11 +62,6 @@ public class IndexingProgressService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markReady(UUID repoId, int totalFiles, int processedFiles, int totalChunks, String fullName) {
-        markReady(repoId, totalFiles, processedFiles, totalChunks, fullName, null);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(UUID repoId, String message) {
         gitRepoRepository.findById(repoId).ifPresent(repo -> {
             repo.setIndexStatus(IndexStatus.FAILED);

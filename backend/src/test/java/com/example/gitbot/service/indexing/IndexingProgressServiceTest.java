@@ -61,7 +61,7 @@ class IndexingProgressServiceTest {
         when(gitRepoRepository.findById(repoId)).thenReturn(Optional.of(repo));
         when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        progressService.markReady(repoId, 100, 100, 300, "owner/repo");
+        progressService.markReady(repoId, 100, 100, 300, "owner/repo", null);
 
         assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
         assertThat(repo.getFilesTotal()).isEqualTo(100);

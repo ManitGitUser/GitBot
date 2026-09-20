@@ -60,7 +60,7 @@ class GitRepoPaginationTest {
         when(gitRepoRepository.findWithFilters(eq(userId), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(repos, pageable, 25));
 
-        PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, pageable);
+        PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, null, null, null, pageable);
 
         assertThat(result.content()).hasSize(10);
         assertThat(result.page()).isEqualTo(0);
@@ -92,7 +92,7 @@ class GitRepoPaginationTest {
         when(gitRepoRepository.findWithFilters(eq(userId), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(repos, pageable, 25));
 
-        PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, pageable);
+        PageResponse<GitRepoResponse> result = gitRepoService.listStored(userId, null, null, null, pageable);
 
         assertThat(result.content()).hasSize(10);
         assertThat(result.page()).isEqualTo(1);

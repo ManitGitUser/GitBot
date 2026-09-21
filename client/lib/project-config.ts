@@ -10,6 +10,7 @@ export const PROJECT_CONFIG = {
         role: "Developer / Software Engineer",
         githubUrl: "https://github.com/ManitGitUser",
         email: "manithumain@gmail.com",
+        avatarUrl: "/owner-profile.png",
     },
     // The GitBot repository URL can be updated here once the final URL is confirmed
     repositoryUrl: "https://github.com/ManitGitUser/GitBot",

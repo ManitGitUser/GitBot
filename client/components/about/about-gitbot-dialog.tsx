@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, FolderGit2, Mail, PlayCircle, User } from "lucide-react";
+import Image from "next/image";
+import { ExternalLink, FolderGit2, Mail, PlayCircle } from "lucide-react";
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,14 @@ export function AboutGitBotDialog({
                 {/* Developer Information */}
                 <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="rounded-full bg-primary/10 p-1.5 text-primary">
-                                <User className="size-4" />
-                            </div>
+                        <div className="flex items-center gap-2.5">
+                            <Image
+                                src={PROJECT_CONFIG.developer.avatarUrl}
+                                alt={PROJECT_CONFIG.developer.name}
+                                width={28}
+                                height={28}
+                                className="size-7 rounded-full object-cover border border-border/80 shadow-2xs shrink-0"
+                            />
                             <div>
                                 <p className="text-xs font-semibold text-foreground">
                                     {PROJECT_CONFIG.developer.name}

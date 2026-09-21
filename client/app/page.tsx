@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
     ArrowRight,
@@ -7,7 +8,6 @@ import {
     MessageSquareCode,
     PlayCircle,
     Sparkles,
-    User,
 } from "lucide-react";
 
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
@@ -157,9 +157,13 @@ export default function HomePage() {
                   About the Developer
                 </span>
                 <div className="mt-3 flex items-center gap-3.5">
-                  <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <User className="size-5" />
-                  </div>
+                  <Image
+                    src={PROJECT_CONFIG.developer.avatarUrl}
+                    alt={PROJECT_CONFIG.developer.name}
+                    width={44}
+                    height={44}
+                    className="size-11 rounded-full object-cover border border-border/80 shadow-2xs shrink-0"
+                  />
                   <div>
                     <h3 className="font-heading text-base font-semibold text-foreground">
                       {PROJECT_CONFIG.developer.name}

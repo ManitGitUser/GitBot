@@ -60,6 +60,13 @@ public class GitRepoController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(gitRepoService.toResponse(repo));
     }
 
+    @DeleteMapping("/{id}/index")
+    public ResponseEntity<GitRepoResponse> removeIndex(@PathVariable UUID id) {
+        UUID userId = currentUser.require().getId();
+        GitRepo repo = indexingService.removeIndex(id, userId);
+        return ResponseEntity.ok(gitRepoService.toResponse(repo));
+    }
+
     @PostMapping("/{id}/sync")
     public ResponseEntity<SyncRepoResponse> sync(@PathVariable UUID id) {
         UUID userId = currentUser.require().getId();

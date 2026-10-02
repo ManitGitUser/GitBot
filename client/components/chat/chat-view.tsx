@@ -14,6 +14,7 @@ import {
     Lock,
     Share2,
     Shield,
+    Sparkles,
 } from "lucide-react";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -46,7 +47,7 @@ import {
     useShareChatSession,
     useStreamChat,
 } from "@/hooks/use-chat";
-import { useIndexStatus, useRepository } from "@/hooks/use-repos";
+import { useIndexStatus, useRepository, useStartIndexing } from "@/hooks/use-repos";
 import type { ChatMessage, ChatSession, ReportReason } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +94,8 @@ export function ChatView({ repoId }: { repoId: string }) {
     const indexStatus = statusQuery.data?.indexStatus ?? repoQuery.data?.indexStatus;
     const ready = indexStatus === "READY";
 
-    const sessionsQuery = useChatSessions(repoId, ready);
+    const sessionsQuery = useChatSessions(repoId, Boolean(repoId));
+    const indexMutation = useStartIndexing();
     const createSession = useCreateChatSession(repoId);
     const branchSession = useBranchChatSession(repoId);
     const shareSession = useShareChatSession();
@@ -232,8 +234,9 @@ export function ChatView({ repoId }: { repoId: string }) {
     };
 
     useEffect(() => {
+        if (isOpenMode) return;
         if (!ready || sessionsQuery.isLoading) return;
-        if (isOpenMode && selectedSessionId === null) return;
+        if (selectedSessionId !== null) return;
         if (allSessions.length > 0) return;
         if (
             !sessionsQuery.isSuccess ||
@@ -458,7 +461,7 @@ export function ChatView({ repoId }: { repoId: string }) {
                 </div>
 
                 <section className="flex min-h-0 min-w-0 flex-1 flex-col md:h-full md:overflow-hidden">
-                    {!ready ? (
+                    {!ready && !sessionId ? (
                         <IndexingState repo={repo} status={statusQuery.data} />
                     ) : (
                         <>
@@ -472,23 +475,44 @@ export function ChatView({ repoId }: { repoId: string }) {
                                 onLoadEarlier={messagesQuery.loadEarlier}
                                 isLoadingEarlier={messagesQuery.isLoadingEarlier}
                                 streaming={streaming}
-                                onRetry={(msgId) => retry(msgId)}
-                                onBranch={handleStartBranch}
+                                onRetry={ready ? (msgId) => retry(msgId) : undefined}
+                                onBranch={ready ? handleStartBranch : undefined}
                                 onReport={handleStartReport}
                                 onShare={() => setShareOpen(true)}
                                 hasActiveSession={Boolean(sessionId)}
-                                onNewChat={() =>
+                                onNewChat={() => {
+                                    autoCreateRef.current = true;
                                     createSession.mutate("New chat", {
                                         onSuccess: (session) => setSelectedSessionId(session.id),
-                                    })
-                                }
+                                    });
+                                }}
+                                ready={ready}
                             />
+                            {!ready && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-amber-500/10 border-amber-500/20 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+                                    <span>
+                                        Repository is not indexed. You can still view this conversation, but new messages are disabled until the repository is indexed again.
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="default"
+                                        disabled={isIndexing || indexMutation.isPending}
+                                        onClick={() => indexMutation.mutate(repo.id)}
+                                        className="h-7 text-xs"
+                                    >
+                                        <Sparkles className="size-3.5" />
+                                        Index Repository
+                                    </Button>
+                                </div>
+                            )}
                             <ChatComposer
-                                disabled={!sessionId}
+                                disabled={!ready || !sessionId}
                                 placeholder={
-                                    !sessionId
-                                        ? "Select a conversation or start a new chat to begin…"
-                                        : undefined
+                                    !ready
+                                        ? "Repository is not indexed. Index it again to continue chatting."
+                                        : !sessionId
+                                            ? "Select a conversation or start a new chat to begin…"
+                                            : undefined
                                 }
                                 streaming={streaming}
                                 onSend={send}

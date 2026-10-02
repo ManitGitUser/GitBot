@@ -88,14 +88,55 @@ class GitRepoControllerTest {
     }
 
     @Test
-    void status_whenRepoNotOwnedOrNotFound_returnsNotFound() throws Exception {
-        when(gitRepoService.status(repoId, userId))
+    void removeIndex_success_returnsOkAndRepoResponse() throws Exception {
+        com.example.gitbot.entity.GitRepo repo = com.example.gitbot.entity.GitRepo.builder()
+                .id(repoId)
+                .userId(userId)
+                .fullName("testuser/test-repo")
+                .indexStatus(IndexStatus.PENDING)
+                .chunkCount(0)
+                .build();
+        com.example.gitbot.dto.GitRepoResponse expectedResponse = new com.example.gitbot.dto.GitRepoResponse(
+                repoId, 12345L, "testuser", "test-repo", "testuser/test-repo", false,
+                "main", "Java", "https://github.com/testuser/test-repo", "Description",
+                IndexStatus.PENDING, null, 0, 0, 0, null, null, null
+        );
+
+        when(indexingService.removeIndex(repoId, userId)).thenReturn(repo);
+        when(gitRepoService.toResponse(repo)).thenReturn(expectedResponse);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/repos/{id}/index", repoId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(repoId.toString()))
+                .andExpect(jsonPath("$.indexStatus").value("PENDING"))
+                .andExpect(jsonPath("$.chunkCount").value(0));
+
+        verify(indexingService).removeIndex(repoId, userId);
+        verify(gitRepoService).toResponse(repo);
+    }
+
+    @Test
+    void removeIndex_whenIndexingInProgress_returnsConflict() throws Exception {
+        when(indexingService.removeIndex(repoId, userId))
+                .thenThrow(new com.example.gitbot.exception.ConflictException("Cannot remove index while indexing is in progress"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/repos/{id}/index", repoId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cannot remove index while indexing is in progress"));
+
+        verify(indexingService).removeIndex(repoId, userId);
+    }
+
+    @Test
+    void removeIndex_whenRepoNotFound_returnsNotFound() throws Exception {
+        when(indexingService.removeIndex(repoId, userId))
                 .thenThrow(new NotFoundException("Repository not found"));
 
-        mockMvc.perform(get("/api/repos/{id}/status", repoId))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/repos/{id}/index", repoId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Repository not found"));
 
-        verify(gitRepoService).status(repoId, userId);
+        verify(indexingService).removeIndex(repoId, userId);
     }
 }
+

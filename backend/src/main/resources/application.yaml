@@ -77,3 +77,10 @@ app:
     max-neighboring-chunks: 4
   github:
     api-delay-ms: 50
+  demo:
+    repo-full-name: ${DEMO_REPO_FULL_NAME:ManitGitUser/GitBot}
+    token-secret: ${DEMO_TOKEN_SECRET:${app.token-encryptor-password:gitbot-demo-secret-key-at-least-32-chars-long!}}
+    max-messages: 5
+    max-message-chars: 1000
+    token-ttl-seconds: 7200
+    ip-rate-limit-per-minute: 20

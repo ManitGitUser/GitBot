@@ -103,6 +103,10 @@ export function ChatComposer({
                         </span>
                     )}
                 </div>
+
+                <p className="text-center text-[11px] text-muted-foreground/75">
+                    GitBot can make mistakes. Double-check responses.
+                </p>
             </div>
         </div>
     );

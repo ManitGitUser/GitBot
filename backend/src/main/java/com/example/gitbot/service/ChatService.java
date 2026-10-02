@@ -22,6 +22,7 @@ import com.example.gitbot.enums.MessageRole;
 import com.example.gitbot.enums.MessageStatus;
 import com.example.gitbot.enums.ReportReason;
 import com.example.gitbot.exception.BadRequestException;
+import com.example.gitbot.exception.ConflictException;
 import com.example.gitbot.exception.NotFoundException;
 import com.example.gitbot.repository.ChatMessageRepository;
 import com.example.gitbot.repository.ChatSessionRepository;
@@ -55,7 +56,7 @@ public class ChatService {
     public ChatSessionResponse createSession(UUID userId, CreateChatSessionRequest request) {
         GitRepo repo = gitRepoService.requireOwned(request.repositoryId(), userId);
         if (repo.getIndexStatus() != IndexStatus.READY) {
-            throw new BadRequestException("Repository must be indexed before chatting");
+            throw new ConflictException("This repository is not indexed. Index it again to continue chatting.");
         }
 
         String title = request.title() != null && !request.title().isBlank()
@@ -160,7 +161,7 @@ public class ChatService {
         ChatSession session = requireSession(userId, sessionId);
         GitRepo repo = gitRepoService.requireOwned(session.getRepositoryId(), userId);
         if (repo.getIndexStatus() != IndexStatus.READY) {
-            throw new BadRequestException("Repository is not ready for chat");
+            throw new ConflictException("This repository is not indexed. Index it again to continue chatting.");
         }
 
         // Cancel any existing active stream and persist interrupted state before
@@ -225,7 +226,7 @@ public class ChatService {
         ChatSession session = requireSession(userId, sessionId);
         GitRepo repo = gitRepoService.requireOwned(session.getRepositoryId(), userId);
         if (repo.getIndexStatus() != IndexStatus.READY) {
-            throw new BadRequestException("Repository is not ready for chat");
+            throw new ConflictException("This repository is not indexed. Index it again to continue chatting.");
         }
 
         // Cancel any existing active stream and persist interrupted state before
@@ -329,6 +330,11 @@ public class ChatService {
     @Transactional
     public ChatSessionResponse branchSession(UUID userId, UUID sessionId, UUID cutoffMessageId, String newTitle) {
         ChatSession parentSession = requireSession(userId, sessionId);
+        GitRepo repo = gitRepoService.requireOwned(parentSession.getRepositoryId(), userId);
+        if (repo.getIndexStatus() != IndexStatus.READY) {
+            throw new ConflictException("This repository is not indexed. Index it again to continue chatting.");
+        }
+
         ChatMessage cutoffMessage = chatMessageRepository.findByIdAndSessionId(cutoffMessageId, sessionId)
                 .orElseThrow(() -> new NotFoundException("Message not found in this session"));
 

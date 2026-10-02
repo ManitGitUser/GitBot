@@ -29,6 +29,13 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <ModeToggle />
             <Link
+                href="/demo"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+            >
+              <Sparkles className="size-3.5 text-amber-500" />
+              <span>Try Demo</span>
+            </Link>
+            <Link
                 href="/login"
                 className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
             >
@@ -51,24 +58,33 @@ export default function HomePage() {
                 {PROJECT_CONFIG.description}
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-              <a
-                  href={getGithubLoginUrl()}
-                  className={cn(
-                      buttonVariants({ size: "lg" }),
-                      "inline-flex items-center gap-1.5"
-                  )}
-              >
-                <FolderGit2 className="size-4" />
-                Continue with GitHub
-                <ArrowRight className="size-4" />
-              </a>
-              <Link
-                  href="/login"
-                  className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-              >
-                See how it works
-              </Link>
+            <div className="flex flex-col items-center gap-2.5 pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link
+                    href="/demo"
+                    className={cn(
+                        buttonVariants({ size: "lg" }),
+                        "inline-flex items-center gap-2 shadow-sm font-medium"
+                    )}
+                >
+                  <Sparkles className="size-4 text-amber-400" />
+                  Try GitBot
+                  <ArrowRight className="size-4" />
+                </Link>
+                <a
+                    href={getGithubLoginUrl()}
+                    className={cn(
+                        buttonVariants({ variant: "outline", size: "lg" }),
+                        "inline-flex items-center gap-2"
+                    )}
+                >
+                  <GitHubIcon className="size-4" />
+                  Sign in with GitHub
+                </a>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                No sign-in required · Explore GitBot&apos;s own codebase in demo mode
+              </p>
             </div>
           </section>
 

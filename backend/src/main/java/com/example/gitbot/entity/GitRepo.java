@@ -44,6 +44,10 @@ public class GitRepo {
     @Column(name = "is_private", nullable = false)
     private boolean isPrivate;
 
+    @Column(name = "is_demo", nullable = false)
+    @Builder.Default
+    private boolean isDemo = false;
+
     @Column(name = "default_branch", nullable = false, length = 100)
     private String defaultBranch;
 

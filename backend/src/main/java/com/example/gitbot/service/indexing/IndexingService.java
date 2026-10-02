@@ -8,12 +8,16 @@ import java.util.UUID;
 import com.example.gitbot.entity.GitRepo;
 import com.example.gitbot.enums.IndexStatus;
 import com.example.gitbot.exception.BadRequestException;
+import com.example.gitbot.exception.ConflictException;
 import com.example.gitbot.exception.NotFoundException;
 import com.example.gitbot.service.ai.RagSettings;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
@@ -26,7 +30,6 @@ import com.example.gitbot.service.UserService;
 import com.example.gitbot.service.github.GitHubApiClient;
 import com.example.gitbot.service.github.GitHubRateLimiter;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -48,7 +51,6 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class IndexingService {
 
@@ -63,16 +65,54 @@ public class IndexingService {
     private final GitHubRateLimiter rateLimiter;
     private final VectorStore vectorStore;
     private final IndexingProgressService progressService;
+    private final JdbcTemplate jdbcTemplate;
+
+    public IndexingService(
+            GitRepoRepository gitRepoRepository,
+            UserService userService,
+            GitHubApiClient gitHubApiClient,
+            CodeFileFilter fileFilter,
+            CodeChunker codeChunker,
+            GitHubRateLimiter rateLimiter,
+            VectorStore vectorStore,
+            IndexingProgressService progressService
+    ) {
+        this(gitRepoRepository, userService, gitHubApiClient, fileFilter, codeChunker, rateLimiter, vectorStore, progressService, null);
+    }
+
+    @Autowired
+    public IndexingService(
+            GitRepoRepository gitRepoRepository,
+            UserService userService,
+            GitHubApiClient gitHubApiClient,
+            CodeFileFilter fileFilter,
+            CodeChunker codeChunker,
+            GitHubRateLimiter rateLimiter,
+            VectorStore vectorStore,
+            IndexingProgressService progressService,
+            @Autowired(required = false) JdbcTemplate jdbcTemplate
+    ) {
+        this.gitRepoRepository = gitRepoRepository;
+        this.userService = userService;
+        this.gitHubApiClient = gitHubApiClient;
+        this.fileFilter = fileFilter;
+        this.codeChunker = codeChunker;
+        this.rateLimiter = rateLimiter;
+        this.vectorStore = vectorStore;
+        this.progressService = progressService;
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     @Value("${app.indexing.max-file-bytes:102400}")
     private long maxFileBytes;
 
+    @Transactional
     public GitRepo startIndexing(UUID repoId, UUID userId) {
-        GitRepo repo = gitRepoRepository.findByIdAndUserId(repoId, userId)
+        GitRepo repo = gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)
                 .orElseThrow(() -> new NotFoundException("Repository not found"));
 
         if (repo.getIndexStatus() == IndexStatus.INDEXING) {
-            throw new BadRequestException("Repository is already being indexed");
+            throw new ConflictException("Repository is already being indexed");
         }
 
         repo.setIndexStatus(IndexStatus.INDEXING);
@@ -80,6 +120,51 @@ public class IndexingService {
         repo.setFilesTotal(0);
         repo.setChunkCount(0);
         repo.setErrorMessage(null);
+        return gitRepoRepository.save(repo);
+    }
+
+    @Transactional
+    public GitRepo removeIndex(UUID repoId, UUID userId) {
+        GitRepo repo = gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)
+                .orElseThrow(() -> new NotFoundException("Repository not found"));
+
+        if (repo.getIndexStatus() == IndexStatus.INDEXING) {
+            throw new ConflictException("Cannot remove index while indexing is in progress");
+        }
+
+        // Idempotency: if already PENDING with 0 chunks and null indexedCommitSha, return current state
+        if (repo.getIndexStatus() == IndexStatus.PENDING && repo.getChunkCount() == 0 && repo.getIndexedCommitSha() == null) {
+            return repo;
+        }
+
+        String repoIdStr = repoId.toString();
+
+        // 1. Delete vector chunks using existing Spring AI vectorStore mechanism
+        var filter = new FilterExpressionBuilder().eq(RagSettings.METADATA_REPO_ID, repoIdStr).build();
+        vectorStore.delete(filter);
+
+        // 2. Defense-in-depth: direct JDBC cleanup and verification
+        if (jdbcTemplate != null) {
+            jdbcTemplate.update("DELETE FROM vector_store WHERE metadata->>'repoId' = ?", repoIdStr);
+            Integer remaining = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM vector_store WHERE metadata->>'repoId' = ?",
+                    Integer.class,
+                    repoIdStr
+            );
+            if (remaining != null && remaining > 0) {
+                throw new IllegalStateException("Failed to delete all vector chunks for repository " + repoId);
+            }
+        }
+
+        // 3. Only after confirmed successful vector deletion, update metadata
+        repo.setIndexStatus(IndexStatus.PENDING);
+        repo.setIndexedCommitSha(null);
+        repo.setChunkCount(0);
+        repo.setFilesProcessed(0);
+        repo.setFilesTotal(0);
+        repo.setIndexedAt(null);
+        repo.setErrorMessage(null);
+
         return gitRepoRepository.save(repo);
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Loader2, RotateCcw } from "lucide-react";
+import { AlertCircle, Loader2, RotateCcw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +47,29 @@ export function IndexingState({
                 >
                     <RotateCcw data-icon="inline-start" />
                     Retry indexing
+                </Button>
+            </Empty>
+        );
+    }
+
+    if (indexStatus === "PENDING") {
+        return (
+            <Empty className="h-full border-0">
+                <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                        <Sparkles className="text-primary" />
+                    </EmptyMedia>
+                    <EmptyTitle>Repository is not indexed</EmptyTitle>
+                    <EmptyDescription>
+                        Index this repository to begin asking questions and exploring code with GitBot.
+                    </EmptyDescription>
+                </EmptyHeader>
+                <Button
+                    onClick={() => indexMutation.mutate(repo.id)}
+                    disabled={indexMutation.isPending}
+                >
+                    <Sparkles data-icon="inline-start" />
+                    Index repository
                 </Button>
             </Empty>
         );

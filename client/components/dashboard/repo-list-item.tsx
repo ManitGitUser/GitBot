@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
@@ -10,22 +11,35 @@ import {
     RefreshCw,
     RotateCcw,
     Sparkles,
+    Trash2,
 } from "lucide-react";
 
 import { LanguageBadge } from "@/components/dashboard/language-badge";
 import { IndexStatusBadge } from "@/components/dashboard/repo-status";
 import { LanguageIcon } from "@/components/icons/language-icon";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { getRepoProgress, useStartIndexing, useSyncRepo } from "@/hooks/use-repos";
+import { getRepoProgress, useRemoveIndex, useStartIndexing, useSyncRepo } from "@/hooks/use-repos";
 import type { Repository } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function RepoListItem({ repo }: { repo: Repository }) {
     const router = useRouter();
     const indexMutation = useStartIndexing();
+    const removeIndexMutation = useRemoveIndex();
     const syncMutation = useSyncRepo();
+    const [confirmRemoveIndexOpen, setConfirmRemoveIndexOpen] = useState(false);
     const hasNewCommit = Boolean(
         repo.latestCommitSha &&
         repo.indexedCommitSha &&
@@ -189,6 +203,20 @@ export function RepoListItem({ repo }: { repo: Repository }) {
                     </Button>
                 )}
 
+                {repo.indexStatus === "READY" && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isIndexing || isSyncing || removeIndexMutation.isPending}
+                        onClick={() => setConfirmRemoveIndexOpen(true)}
+                        title="Remove repository index"
+                        className="h-8 text-xs font-medium text-muted-foreground hover:text-destructive hover:border-destructive/40"
+                    >
+                        <Trash2 className="size-3.5" />
+                        <span className="hidden sm:inline">Remove Index</span>
+                    </Button>
+                )}
+
                 {hasNewCommit && repo.indexStatus === "READY" ? (
                     <Button
                         size="sm"
@@ -245,6 +273,37 @@ export function RepoListItem({ repo }: { repo: Repository }) {
                     </Button>
                 )}
             </div>
+
+            {/* Remove Index Confirmation Alert Dialog */}
+            <AlertDialog open={confirmRemoveIndexOpen} onOpenChange={setConfirmRemoveIndexOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove repository index?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently remove the indexed code chunks for this repository and free database storage.
+                            Your repository connection and existing conversations will not be deleted.
+                            You can index the repository again later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setConfirmRemoveIndexOpen(false)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            disabled={removeIndexMutation.isPending}
+                            onClick={() => {
+                                removeIndexMutation.mutate(repo.id, {
+                                    onSuccess: () => setConfirmRemoveIndexOpen(false),
+                                });
+                            }}
+                        >
+                            {removeIndexMutation.isPending ? <Spinner className="size-3.5" /> : null}
+                            Remove Index
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

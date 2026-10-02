@@ -104,6 +104,33 @@ export function useStartIndexing() {
     });
 }
 
+export function useRemoveIndex() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (repoId: string) => api.removeIndex(repoId),
+        onSuccess: (repo) => {
+            queryClient.setQueryData(queryKeys.repos.detail(repo.id), repo);
+            updateRepoInListCache(queryClient, repo);
+            void queryClient.invalidateQueries({
+                queryKey: queryKeys.repos.status(repo.id),
+            });
+            toast.add({
+                title: "Index removed",
+                description: `Code index removed for ${repo.fullName}.`,
+                type: "success",
+            });
+        },
+        onError: (error: Error) => {
+            toast.add({
+                title: "Could not remove index",
+                description: error.message,
+                type: "error",
+            });
+        },
+    });
+}
+
 
 export function useSyncRepo() {
     const queryClient = useQueryClient();

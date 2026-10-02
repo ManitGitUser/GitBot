@@ -59,6 +59,7 @@ function copyToClipboard(text: string): Promise<boolean> {
 function AssistantMessageToolbar({
     message,
     streaming,
+    ready = true,
     onRetry,
     onBranch,
     onReport,
@@ -66,6 +67,7 @@ function AssistantMessageToolbar({
 }: {
     message: ChatMessage;
     streaming?: boolean;
+    ready?: boolean;
     onRetry?: (messageId: string) => void;
     onBranch?: (message: ChatMessage) => void;
     onReport?: (message: ChatMessage) => void;
@@ -116,10 +118,10 @@ function AssistantMessageToolbar({
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    disabled={streaming}
+                    disabled={streaming || !ready}
                     onClick={() => onRetry(message.id)}
                     aria-label="Retry generating this response"
-                    title={streaming ? "Wait for generation to finish" : undefined}
+                    title={streaming ? "Wait for generation to finish" : !ready ? "Repository is not indexed. Index it again to retry." : undefined}
                 >
                     <RotateCcw className="size-3.5" />
                     <span className="ml-1">Retry</span>
@@ -131,10 +133,10 @@ function AssistantMessageToolbar({
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    disabled={streaming}
+                    disabled={streaming || !ready}
                     onClick={() => onBranch(message)}
                     aria-label="Branch new conversation from this message"
-                    title={streaming ? "Wait for generation to finish" : undefined}
+                    title={streaming ? "Wait for generation to finish" : !ready ? "Repository is not indexed. Index it again to branch." : undefined}
                 >
                     <GitFork className="size-3.5" />
                     <span className="ml-1">Branch</span>
@@ -233,6 +235,7 @@ export function ChatMessages({
     onShare,
     hasActiveSession = true,
     onNewChat,
+    ready = true,
 }: {
     repo: Repository;
     messages: ChatMessage[];
@@ -249,6 +252,7 @@ export function ChatMessages({
     onShare?: () => void;
     hasActiveSession?: boolean;
     onNewChat?: () => void;
+    ready?: boolean;
 }) {
     const { data: user } = useCurrentUser();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -580,6 +584,7 @@ export function ChatMessages({
                                             <AssistantMessageToolbar
                                                 message={message}
                                                 streaming={streaming}
+                                                ready={ready}
                                                 onRetry={onRetry}
                                                 onBranch={onBranch}
                                                 onReport={onReport}

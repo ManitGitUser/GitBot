@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
@@ -10,23 +11,35 @@ import {
     RefreshCw,
     RotateCcw,
     Sparkles,
+    Trash2,
 } from "lucide-react";
 
 import { IndexErrorAlert } from "@/components/dashboard/index-error-alert";
-import { LanguageBadge } from "@/components/dashboard/language-badge";
 import { IndexStatusBadge } from "@/components/dashboard/repo-status";
 import { LanguageIcon } from "@/components/icons/language-icon";
-import { Button, buttonVariants } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { getRepoProgress, useStartIndexing, useSyncRepo } from "@/hooks/use-repos";
+import { getRepoProgress, useRemoveIndex, useStartIndexing, useSyncRepo } from "@/hooks/use-repos";
 import type { Repository } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function RepoCard({ repo }: { repo: Repository }) {
     const router = useRouter();
     const indexMutation = useStartIndexing();
+    const removeIndexMutation = useRemoveIndex();
     const syncMutation = useSyncRepo();
+    const [confirmRemoveIndexOpen, setConfirmRemoveIndexOpen] = useState(false);
     const hasNewCommit = Boolean(
         repo.latestCommitSha &&
         repo.indexedCommitSha &&
@@ -58,14 +71,12 @@ export function RepoCard({ repo }: { repo: Repository }) {
     return (
         <article
             className={cn(
-                "group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs transition-all hover:border-border hover:shadow-sm",
-                isFailed && "border-destructive/30 bg-destructive/[0.02] hover:border-destructive/40"
+                "group relative flex flex-col justify-between overflow-hidden rounded-xl border bg-card text-card-foreground shadow-2xs transition-all hover:border-ring/30 hover:shadow-sm"
             )}
         >
-            <div className="border-b border-border/60 p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2.5">
-                        <LanguageBadge language={repo.language} showLabel={false} />
+            <div className="border-b border-border/60 p-3.5 pb-2.5">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                         <div className="min-w-0">
                             <p className="truncate text-xs text-muted-foreground">{repo.owner}</p>
                             <h3 className="truncate font-semibold text-sm">{repo.name}</h3>
@@ -144,18 +155,15 @@ export function RepoCard({ repo }: { repo: Repository }) {
                 )}
             </div>
 
-            <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 p-3.5">
+            <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-3.5 py-2.5">
                 {repo.htmlUrl ? (
                     <a
                         href={repo.htmlUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={cn(
-                            buttonVariants({ variant: "ghost", size: "sm" }),
-                            "h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                        )}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
-                        <ExternalLink className="size-3.5" />
+                        <ExternalLink className="size-3" />
                         GitHub
                     </a>
                 ) : (
@@ -183,6 +191,19 @@ export function RepoCard({ repo }: { repo: Repository }) {
                         <Button variant="secondary" size="sm" onClick={openChat}>
                             <MessageSquare data-icon="inline-start" />
                             Chat
+                        </Button>
+                    )}
+                    {repo.indexStatus === "READY" && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isIndexing || isSyncing || removeIndexMutation.isPending}
+                            onClick={() => setConfirmRemoveIndexOpen(true)}
+                            title="Remove repository index"
+                            className="text-muted-foreground hover:text-destructive hover:border-destructive/40"
+                        >
+                            <Trash2 className="size-3.5" />
+                            <span className="hidden sm:inline">Remove Index</span>
                         </Button>
                     )}
                     {hasNewCommit && repo.indexStatus === "READY" ? (
@@ -238,6 +259,37 @@ export function RepoCard({ repo }: { repo: Repository }) {
                     )}
                 </div>
             </div>
+
+            {/* Remove Index Confirmation Alert Dialog */}
+            <AlertDialog open={confirmRemoveIndexOpen} onOpenChange={setConfirmRemoveIndexOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove repository index?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently remove the indexed code chunks for this repository and free database storage.
+                            Your repository connection and existing conversations will not be deleted.
+                            You can index the repository again later.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setConfirmRemoveIndexOpen(false)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            disabled={removeIndexMutation.isPending}
+                            onClick={() => {
+                                removeIndexMutation.mutate(repo.id, {
+                                    onSuccess: () => setConfirmRemoveIndexOpen(false),
+                                });
+                            }}
+                        >
+                            {removeIndexMutation.isPending ? <Spinner className="size-3.5" /> : null}
+                            Remove Index
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </article>
     );
 }

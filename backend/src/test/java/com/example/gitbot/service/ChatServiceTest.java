@@ -20,6 +20,7 @@ import com.example.gitbot.enums.MessageRole;
 import com.example.gitbot.enums.MessageStatus;
 import com.example.gitbot.enums.ReportReason;
 import com.example.gitbot.exception.BadRequestException;
+import com.example.gitbot.exception.ConflictException;
 import com.example.gitbot.exception.NotFoundException;
 import com.example.gitbot.repository.ChatMessageRepository;
 import com.example.gitbot.repository.ChatSessionRepository;
@@ -155,6 +156,7 @@ class ChatServiceTest {
         ChatMessage m1 = ChatMessage.builder().id(UUID.randomUUID()).sessionId(sessionId).role(MessageRole.USER).content("Q1").createdAt(cutoffTime.minusSeconds(5)).build();
 
         when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
         when(chatMessageRepository.findByIdAndSessionId(cutoffId, sessionId)).thenReturn(Optional.of(cutoffMessage));
         when(chatSessionRepository.save(any(ChatSession.class))).thenAnswer(invocation -> {
             ChatSession s = invocation.getArgument(0);
@@ -360,5 +362,59 @@ class ChatServiceTest {
         verify(chatMessageRepository).findMessagesAfter(eq(sessionId), eq(userMsg.getCreatedAt()), eq(userMsg.getId()), eq(org.springframework.data.domain.PageRequest.of(0, 1)));
         verify(chatMessageRepository, never()).findBySessionIdOrderByCreatedAtAsc(any());
         verify(chatStreamHandler).stream(eq(sessionId), any(), any(), any(), eq(nextAssistant.getId()));
+    }
+
+    @Test
+    void createSession_throwsConflict_whenRepoNotReady() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
+
+        assertThatThrownBy(() -> chatService.createSession(userId, new com.example.gitbot.dto.CreateChatSessionRequest(repoId, "New Title")))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("This repository is not indexed. Index it again to continue chatting.");
+
+        verify(chatSessionRepository, never()).save(any());
+    }
+
+    @Test
+    void streamReply_throwsConflict_whenRepoNotReady_andDoesNotSaveUserMessageOrCallRAG() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+        when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
+
+        assertThatThrownBy(() -> chatService.streamReply(userId, sessionId, "Hello world"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("This repository is not indexed. Index it again to continue chatting.");
+
+        verify(chatMessageRepository, never()).save(any());
+        verify(codeContextRetriever, never()).retrieve(any(), any());
+        verify(chatPromptBuilder, never()).buildMessages(any(), any(), any(), any());
+        verify(chatStreamHandler, never()).stream(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void streamRetry_throwsConflict_whenRepoNotReady() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+        when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
+
+        assertThatThrownBy(() -> chatService.streamRetry(userId, sessionId, UUID.randomUUID()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("This repository is not indexed. Index it again to continue chatting.");
+
+        verify(chatStreamHandler, never()).stream(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void branchSession_throwsConflict_whenRepoNotReady() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+        when(chatSessionRepository.findByIdAndUserId(sessionId, userId)).thenReturn(Optional.of(session));
+        when(gitRepoService.requireOwned(repoId, userId)).thenReturn(repo);
+
+        assertThatThrownBy(() -> chatService.branchSession(userId, sessionId, UUID.randomUUID(), "Branch title"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("This repository is not indexed. Index it again to continue chatting.");
+
+        verify(chatSessionRepository, never()).save(any());
     }
 }

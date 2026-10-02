@@ -15,6 +15,13 @@ public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
 
     Optional<GitRepo> findByIdAndUserId(UUID id, UUID userId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT r FROM GitRepo r WHERE r.id = :id AND r.userId = :userId")
+    Optional<GitRepo> findByIdAndUserIdForUpdate(
+            @org.springframework.data.repository.query.Param("id") UUID id,
+            @org.springframework.data.repository.query.Param("userId") UUID userId
+    );
+
     Optional<GitRepo> findByUserIdAndGithubRepoId(UUID userId, Long githubRepoId);
  
     List<GitRepo> findByIndexStatus(com.example.gitbot.enums.IndexStatus indexStatus);
@@ -37,4 +44,9 @@ public interface GitRepoRepository extends JpaRepository<GitRepo, UUID> {
             @org.springframework.data.repository.query.Param("search") String search,
             Pageable pageable
     );
+
+    Optional<GitRepo> findFirstByIsDemoTrue();
+
+    Optional<GitRepo> findByFullName(String fullName);
 }
+

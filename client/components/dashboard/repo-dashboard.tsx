@@ -21,14 +21,42 @@ import type { IndexStatus } from "@/lib/api";
 type FilterStatus = "ALL" | IndexStatus;
 
 const VIEW_MODE_STORAGE_KEY = "gitbot_repo_view_mode";
+const STATUS_STORAGE_KEY = "gitbot_repo_filter_status";
+const VISIBILITY_STORAGE_KEY = "gitbot_repo_filter_visibility";
 
 export function RepoDashboard() {
     const [page, setPage] = useState(0);
     const [search, setSearch] = useState("");
-    const [status, setStatus] = useState<FilterStatus>("ALL");
-    const [visibility, setVisibility] = useState<"all" | "public" | "private">(
-        "all"
-    );
+    const [status, setStatus] = useState<FilterStatus>(() => {
+        if (typeof window === "undefined") return "ALL";
+        try {
+            const saved = localStorage.getItem(STATUS_STORAGE_KEY);
+            if (
+                saved === "ALL" ||
+                saved === "READY" ||
+                saved === "INDEXING" ||
+                saved === "PENDING" ||
+                saved === "FAILED"
+            ) {
+                return saved as FilterStatus;
+            }
+        } catch {
+            // ignore
+        }
+        return "ALL";
+    });
+    const [visibility, setVisibility] = useState<"all" | "public" | "private">(() => {
+        if (typeof window === "undefined") return "all";
+        try {
+            const saved = localStorage.getItem(VISIBILITY_STORAGE_KEY);
+            if (saved === "all" || saved === "public" || saved === "private") {
+                return saved as "all" | "public" | "private";
+            }
+        } catch {
+            // ignore
+        }
+        return "all";
+    });
 
     const reposQuery = useRepos(page, 10, status, visibility, search);
     const syncAllMutation = useSyncAllRepos();
@@ -63,11 +91,21 @@ export function RepoDashboard() {
     const handleVisibilityChange = (value: "all" | "public" | "private") => {
         setVisibility(value);
         setPage(0);
+        try {
+            localStorage.setItem(VISIBILITY_STORAGE_KEY, value);
+        } catch {
+            // ignore
+        }
     };
 
     const handleStatusChange = (value: FilterStatus) => {
         setStatus(value);
         setPage(0);
+        try {
+            localStorage.setItem(STATUS_STORAGE_KEY, value);
+        } catch {
+            // ignore
+        }
     };
 
     const pageData = reposQuery.data;

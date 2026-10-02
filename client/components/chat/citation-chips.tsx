@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import type { Citation, Repository } from "@/lib/api";
+import type { Citation } from "@/lib/api";
 
 export function encodeFilePath(filePath: string): string {
     return filePath
@@ -12,8 +12,12 @@ export function encodeFilePath(filePath: string): string {
         .join("/");
 }
 
-export function citationHref(repo: Repository, citation: Citation) {
+export function citationHref(
+    repo: { fullName: string; defaultBranch?: string | null },
+    citation: Citation
+) {
     const fullName = citation.repoFullName || repo.fullName;
+    const branch = repo.defaultBranch || "main";
     const encodedPath = encodeFilePath(citation.filePath);
     const line =
         citation.startLine != null
@@ -23,14 +27,14 @@ export function citationHref(repo: Repository, citation: Citation) {
                     : ""
             }`
             : "";
-    return `https://github.com/${fullName}/blob/${repo.defaultBranch}/${encodedPath}${line}`;
+    return `https://github.com/${fullName}/blob/${branch}/${encodedPath}${line}`;
 }
 
 export function CitationChips({
                                   repo,
                                   citations,
                               }: {
-    repo: Repository;
+    repo: { fullName: string; defaultBranch?: string | null };
     citations: Citation[];
 }) {
     if (!citations.length) return null;

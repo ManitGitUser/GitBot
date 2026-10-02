@@ -104,6 +104,18 @@ export type PublicSharedChat = {
     messages: ChatMessage[];
 };
 
+export type DemoStatusResponse = {
+    enabled: boolean;
+    repoName: string;
+    repoFullName: string;
+    maxMessages: number;
+};
+
+export type DemoChatMessage = {
+    role: "USER" | "ASSISTANT";
+    content: string;
+};
+
 export type PageResponse<T> = {
     content: T[];
     page: number;
@@ -291,6 +303,8 @@ export const api = {
         apiFetch<SyncAllReposResponse>("/api/repos/sync-all", { method: "POST" }),
     startIndex: (id: string) =>
         apiFetch<Repository>(`/api/repos/${id}/index`, { method: "POST" }),
+    removeIndex: (id: string) =>
+        apiFetch<Repository>(`/api/repos/${id}/index`, { method: "DELETE" }),
     syncRepo: (id: string) =>
         apiFetch<SyncRepoResponse>(`/api/repos/${id}/sync`, { method: "POST" }),
     indexStatus: (id: string) =>
@@ -343,4 +357,6 @@ export const api = {
         }),
     getPublicShare: (shareToken: string) =>
         apiFetch<PublicSharedChat>(`/api/public/shares/${shareToken}`),
+    getDemoStatus: () =>
+        apiFetch<DemoStatusResponse>("/api/demo/status"),
 };

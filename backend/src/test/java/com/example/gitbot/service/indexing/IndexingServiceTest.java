@@ -46,6 +46,8 @@ class IndexingServiceTest {
     private IndexingProgressService progressService;
     @Mock
     private GitHubRateLimiter rateLimiter;
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private IndexingService indexingService;
@@ -244,4 +246,148 @@ class IndexingServiceTest {
         verify(progressService).markFailed(eq(dangling1.getId()), contains("interrupted by server restart"));
         verify(progressService).markFailed(eq(dangling2.getId()), contains("interrupted by server restart"));
     }
+
+    @Test
+    void testRemoveIndex_Success_DeletesVectorsAndResetsMetadataToPending() {
+        repo.setIndexStatus(IndexStatus.READY);
+        repo.setIndexedCommitSha("abc123sha");
+        repo.setChunkCount(42);
+        repo.setFilesProcessed(10);
+        repo.setFilesTotal(10);
+        repo.setIndexedAt(java.time.Instant.now());
+        repo.setErrorMessage(null);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(repoId.toString()))).thenReturn(0);
+        when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(i -> i.getArgument(0));
+
+        GitRepo result = indexingService.removeIndex(repoId, userId);
+
+        verify(gitRepoRepository).findByIdAndUserIdForUpdate(repoId, userId);
+        verify(vectorStore).delete(any(Filter.Expression.class));
+        verify(jdbcTemplate).update(contains("DELETE FROM vector_store"), eq(repoId.toString()));
+        verify(jdbcTemplate).queryForObject(contains("SELECT count(*)"), eq(Integer.class), eq(repoId.toString()));
+        verify(gitRepoRepository).save(repo);
+
+        assertThat(result.getIndexStatus()).isEqualTo(IndexStatus.PENDING);
+        assertThat(result.getIndexedCommitSha()).isNull();
+        assertThat(result.getChunkCount()).isZero();
+        assertThat(result.getFilesProcessed()).isZero();
+        assertThat(result.getFilesTotal()).isZero();
+        assertThat(result.getIndexedAt()).isNull();
+        assertThat(result.getErrorMessage()).isNull();
+    }
+
+    @Test
+    void testRemoveIndex_Idempotent_WhenAlreadyPendingWithZeroChunks() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+        repo.setIndexedCommitSha(null);
+        repo.setChunkCount(0);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+
+        GitRepo result = indexingService.removeIndex(repoId, userId);
+
+        assertThat(result).isSameAs(repo);
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
+        verify(jdbcTemplate, never()).update(anyString(), anyString());
+        verify(gitRepoRepository, never()).save(any());
+    }
+
+    @Test
+    void testRemoveIndex_ThrowsConflict_WhenIndexingInProgress() {
+        repo.setIndexStatus(IndexStatus.INDEXING);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> indexingService.removeIndex(repoId, userId))
+                .isInstanceOf(com.example.gitbot.exception.ConflictException.class)
+                .hasMessageContaining("Cannot remove index while indexing is in progress");
+
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
+        verify(gitRepoRepository, never()).save(any());
+    }
+
+    @Test
+    void testStartIndexing_ThrowsConflict_WhenAlreadyIndexing() {
+        repo.setIndexStatus(IndexStatus.INDEXING);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> indexingService.startIndexing(repoId, userId))
+                .isInstanceOf(com.example.gitbot.exception.ConflictException.class)
+                .hasMessageContaining("Repository is already being indexed");
+
+        verify(gitRepoRepository, never()).save(any());
+    }
+
+    @Test
+    void testStartIndexing_Success_AcquiresRowLockAndTransitionsToIndexing() {
+        repo.setIndexStatus(IndexStatus.PENDING);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+        when(gitRepoRepository.save(any(GitRepo.class))).thenAnswer(i -> i.getArgument(0));
+
+        GitRepo result = indexingService.startIndexing(repoId, userId);
+
+        verify(gitRepoRepository).findByIdAndUserIdForUpdate(repoId, userId);
+        assertThat(result.getIndexStatus()).isEqualTo(IndexStatus.INDEXING);
+        assertThat(result.getFilesProcessed()).isZero();
+        assertThat(result.getFilesTotal()).isZero();
+        assertThat(result.getChunkCount()).isZero();
+    }
+
+    @Test
+    void testRemoveIndex_WhenVectorStoreThrows_PreservesTruthfulReadyStateAndDoesNotSave() {
+        repo.setIndexStatus(IndexStatus.READY);
+        repo.setIndexedCommitSha("commit123");
+        repo.setChunkCount(50);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+        doThrow(new RuntimeException("Vector DB connection failed")).when(vectorStore).delete(any(Filter.Expression.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> indexingService.removeIndex(repoId, userId))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Vector DB connection failed");
+
+        // Truthful READY state must be preserved
+        assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("commit123");
+        assertThat(repo.getChunkCount()).isEqualTo(50);
+        verify(gitRepoRepository, never()).save(any());
+    }
+
+    @Test
+    void testRemoveIndex_WhenJdbcVerificationShowsRemainingVectors_ThrowsAndPreservesState() {
+        repo.setIndexStatus(IndexStatus.READY);
+        repo.setIndexedCommitSha("commit123");
+        repo.setChunkCount(50);
+
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, userId)).thenReturn(Optional.of(repo));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(repoId.toString()))).thenReturn(3);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> indexingService.removeIndex(repoId, userId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to delete all vector chunks");
+
+        // Truthful READY state preserved
+        assertThat(repo.getIndexStatus()).isEqualTo(IndexStatus.READY);
+        assertThat(repo.getIndexedCommitSha()).isEqualTo("commit123");
+        assertThat(repo.getChunkCount()).isEqualTo(50);
+        verify(gitRepoRepository, never()).save(any());
+    }
+
+    @Test
+    void testRemoveIndex_Authorization_ThrowsNotFoundWhenUserDoesNotOwnRepo() {
+        UUID otherUserId = UUID.randomUUID();
+        when(gitRepoRepository.findByIdAndUserIdForUpdate(repoId, otherUserId)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> indexingService.removeIndex(repoId, otherUserId))
+                .isInstanceOf(com.example.gitbot.exception.NotFoundException.class)
+                .hasMessageContaining("Repository not found");
+
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
+        verify(gitRepoRepository, never()).save(any());
+    }
 }
+

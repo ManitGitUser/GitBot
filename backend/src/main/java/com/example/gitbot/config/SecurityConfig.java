@@ -57,7 +57,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-                        .ignoringRequestMatchers("/oauth2/**", "/login/oauth2/**")
+                        .ignoringRequestMatchers("/oauth2/**", "/login/oauth2/**", "/api/demo/**")
                 )
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .sessionManagement(session -> session.
@@ -68,6 +68,7 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/api/auth/csrf",
                                 "/api/public/shares/**",
+                                "/api/demo/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/error"

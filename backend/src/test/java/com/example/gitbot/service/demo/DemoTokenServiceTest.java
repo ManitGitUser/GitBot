@@ -1,14 +1,13 @@
 package com.example.gitbot.service.demo;
 
 import com.example.gitbot.exception.BadRequestException;
-import com.example.gitbot.exception.TooManyRequestsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,90 +19,91 @@ class DemoTokenServiceTest {
 
     @BeforeEach
     void setUp() {
-        demoTokenService = new DemoTokenService(secret, 5, 3600, JsonMapper.builder().build());
+        demoTokenService = new DemoTokenService(secret, JsonMapper.builder().build());
     }
 
     @Test
-    void validateAndIncrement_nullOrBlankToken_issuesCount1() {
-        DemoTokenService.TokenResult result = demoTokenService.validateAndIncrement(null);
+    void createToken_and_parseAndVerify_validToken() {
+        String sessionId = UUID.randomUUID().toString();
+        long exp = Instant.now().getEpochSecond() + 3600;
 
-        assertThat(result.currentMessageNumber()).isEqualTo(1);
-        assertThat(result.maxMessages()).isEqualTo(5);
-        assertThat(result.sessionId()).isNotNull();
-        assertThat(result.nextToken()).isNotBlank();
+        String token = demoTokenService.createToken(sessionId, exp);
+        assertThat(token).isNotBlank();
 
-        DemoTokenService.DemoTokenPayload payload = demoTokenService.parseAndVerify(result.nextToken());
-        assertThat(payload.count()).isEqualTo(1);
+        DemoTokenService.DemoTokenPayload payload = demoTokenService.parseAndVerify(token);
+        assertThat(payload.id()).isEqualTo(sessionId);
+        assertThat(payload.exp()).isEqualTo(exp);
         assertThat(payload.demo()).isTrue();
-        assertThat(payload.id()).isEqualTo(result.sessionId());
     }
 
     @Test
-    void validateAndIncrement_sequentialCalls_incrementsUpTo5() {
-        String token = null;
-        for (int i = 1; i <= 4; i++) {
-            DemoTokenService.TokenResult result = demoTokenService.validateAndIncrement(token);
-            assertThat(result.currentMessageNumber()).isEqualTo(i);
-            token = result.nextToken();
-        }
-
-        // 5th message
-        DemoTokenService.TokenResult fifth = demoTokenService.validateAndIncrement(token);
-        assertThat(fifth.currentMessageNumber()).isEqualTo(5);
-
-        // 6th message with token having count=5 must be rejected
-        assertThatThrownBy(() -> demoTokenService.validateAndIncrement(fifth.nextToken()))
-                .isInstanceOf(TooManyRequestsException.class)
-                .hasMessageContaining("Demo limit reached");
-    }
-
-    @Test
-    void validateAndIncrement_tamperedSignature_throwsBadRequestException() {
-        DemoTokenService.TokenResult result = demoTokenService.validateAndIncrement(null);
-        String token = result.nextToken();
+    void parseAndVerify_tamperedSignature_throwsBadRequestException() {
+        String sessionId = UUID.randomUUID().toString();
+        long exp = Instant.now().getEpochSecond() + 3600;
+        String token = demoTokenService.createToken(sessionId, exp);
 
         // Alter signature
         String tampered = token.substring(0, token.length() - 4) + "XXXX";
 
-        assertThatThrownBy(() -> demoTokenService.validateAndIncrement(tampered))
+        assertThatThrownBy(() -> demoTokenService.parseAndVerify(tampered))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Invalid demo token signature");
     }
 
     @Test
-    void validateAndIncrement_tamperedPayloadCount_throwsBadRequestException() throws Exception {
-        DemoTokenService.TokenResult result = demoTokenService.validateAndIncrement(null);
-        String[] parts = result.nextToken().split("\\.");
+    void parseAndVerify_tamperedPayload_throwsBadRequestException() throws Exception {
+        String sessionId = UUID.randomUUID().toString();
+        long exp = Instant.now().getEpochSecond() + 3600;
+        String token = demoTokenService.createToken(sessionId, exp);
+        String[] parts = token.split("\\.");
 
-        // Forge payload with count = 0
+        // Tamper with payload (change session id)
         DemoTokenService.DemoTokenPayload forged = new DemoTokenService.DemoTokenPayload(
-                result.sessionId(), 0, Instant.now().getEpochSecond() + 3600, true
+                UUID.randomUUID().toString(), exp, true
         );
         String forgedPayloadBase64 = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(JsonMapper.builder().build().writeValueAsBytes(forged));
 
         String forgedToken = forgedPayloadBase64 + "." + parts[1];
 
-        assertThatThrownBy(() -> demoTokenService.validateAndIncrement(forgedToken))
+        assertThatThrownBy(() -> demoTokenService.parseAndVerify(forgedToken))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Invalid demo token signature");
     }
 
     @Test
-    void validateAndIncrement_malformedToken_throwsBadRequestException() {
-        assertThatThrownBy(() -> demoTokenService.validateAndIncrement("not-a-token"))
+    void parseAndVerify_malformedToken_throwsBadRequestException() {
+        assertThatThrownBy(() -> demoTokenService.parseAndVerify("not-a-token"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Malformed demo token");
     }
 
     @Test
-    void validateAndIncrement_expiredToken_throwsBadRequestException() {
-        // Create service with -10 second TTL
-        DemoTokenService expiredService = new DemoTokenService(secret, 5, -10, JsonMapper.builder().build());
-        DemoTokenService.TokenResult result = expiredService.validateAndIncrement(null);
+    void parseAndVerify_expiredToken_throwsBadRequestException() {
+        String sessionId = UUID.randomUUID().toString();
+        long pastExp = Instant.now().getEpochSecond() - 60; // 1 min ago
+        String expiredToken = demoTokenService.createToken(sessionId, pastExp);
 
-        assertThatThrownBy(() -> expiredService.validateAndIncrement(result.nextToken()))
+        assertThatThrownBy(() -> demoTokenService.parseAndVerify(expiredToken))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Demo token expired");
+    }
+
+    @Test
+    void parseAndVerify_missingDemoFlag_throwsBadRequestException() throws Exception {
+        record BadPayload(String id, long exp, boolean demo) {}
+        BadPayload bad = new BadPayload(UUID.randomUUID().toString(), Instant.now().getEpochSecond() + 3600, false);
+        byte[] jsonBytes = JsonMapper.builder().build().writeValueAsBytes(bad);
+        String payloadBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(jsonBytes);
+
+        // Valid signature on non-demo payload
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+        byte[] sig = mac.doFinal(payloadBase64.getBytes());
+        String token = payloadBase64 + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sig);
+
+        assertThatThrownBy(() -> demoTokenService.parseAndVerify(token))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("demo flag missing");
     }
 }

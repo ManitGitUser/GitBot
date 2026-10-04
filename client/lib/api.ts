@@ -109,6 +109,7 @@ export type DemoStatusResponse = {
     repoName: string;
     repoFullName: string;
     maxMessages: number;
+    remainingMessages?: number;
 };
 
 export type DemoChatMessage = {

@@ -49,7 +49,7 @@ export function useLogout() {
             setAuthCookie(false);
             queryClient.setQueryData(queryKeys.auth.me(), null);
             await queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
-            router.replace("/login");
+            router.replace("/");
         },
     });
 }

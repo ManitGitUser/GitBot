@@ -48,7 +48,7 @@ class DemoControllerTest {
 
     @Test
     void getDemoStatus_returnsOk() throws Exception {
-        when(demoChatService.getDemoStatus()).thenReturn(
+        when(demoChatService.getDemoStatus(any())).thenReturn(
                 new DemoStatusResponse(true, "GitBot", "ManitGitUser/GitBot", 5)
         );
 

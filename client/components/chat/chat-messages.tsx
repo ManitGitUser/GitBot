@@ -10,6 +10,7 @@ import {
     Plus,
     RotateCcw,
     Share2,
+    Sparkles,
     StopCircle,
     UserRound,
 } from "lucide-react";
@@ -596,9 +597,9 @@ export function ChatMessages({
                             );
                         })}
 
-                        {streamText && !retryingMessageId && (
+                        {(streaming || streamText) && !retryingMessageId && (streamText || messages[messages.length - 1]?.role === "USER") && (
                             <Message align="start" className="group/msg relative w-full max-w-full">
-                                <MessageAvatar>
+                                <MessageAvatar className="self-start mt-0.5">
                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent p-0">
                                         <GitBotIcon className="size-8 rounded-lg" />
                                     </div>
@@ -606,7 +607,21 @@ export function ChatMessages({
                                 <MessageContent>
                                     <Bubble variant="ghost" align="start" className="max-w-full bg-transparent border-none shadow-none">
                                         <BubbleContent className="w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground">
-                                            <ChatMarkdown content={streamText} isStreaming />
+                                            {streamText ? (
+                                                <ChatMarkdown content={streamText} isStreaming />
+                                            ) : (
+                                                <div className="flex items-center gap-2.5 py-1.5 text-sm text-muted-foreground animate-in fade-in duration-200">
+                                                    <Sparkles className="size-4 text-primary animate-pulse shrink-0" />
+                                                    <span className="font-medium text-xs text-foreground/80">
+                                                        Searching codebase and preparing response
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                        <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                        <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "300ms" }} />
+                                                    </span>
+                                                </div>
+                                            )}
                                         </BubbleContent>
                                     </Bubble>
                                 </MessageContent>

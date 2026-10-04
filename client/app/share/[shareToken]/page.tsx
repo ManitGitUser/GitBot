@@ -244,6 +244,12 @@ export default function SharedChatPage({
                                             </MessageFooter>
                                         )}
 
+                                        {isUser && (
+                                            <div className="mt-1 flex justify-end">
+                                                <CopyAnswerButton text={message.content} />
+                                            </div>
+                                        )}
+
                                         {!isUser && (
                                             <div className="mt-1">
                                                 <CopyAnswerButton text={message.content} />

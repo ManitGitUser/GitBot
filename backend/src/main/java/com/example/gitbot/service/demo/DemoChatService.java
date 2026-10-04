@@ -48,7 +48,7 @@ public class DemoChatService {
     private final ChatPromptBuilder chatPromptBuilder;
     private final CitationMapper citationMapper;
     private final ChatModel chatModel;
-    private final DemoTokenService demoTokenService;
+    private final DemoSessionRedisService demoSessionRedisService;
     private final DemoRateLimiter demoRateLimiter;
     private final String configuredRepoFullName;
     private final int maxMessages;
@@ -60,7 +60,7 @@ public class DemoChatService {
             ChatPromptBuilder chatPromptBuilder,
             CitationMapper citationMapper,
             ChatModel chatModel,
-            DemoTokenService demoTokenService,
+            DemoSessionRedisService demoSessionRedisService,
             DemoRateLimiter demoRateLimiter,
             @Value("${app.demo.repo-full-name:ManitGitUser/GitBot}") String configuredRepoFullName,
             @Value("${app.demo.max-messages:5}") int maxMessages,
@@ -71,7 +71,7 @@ public class DemoChatService {
         this.chatPromptBuilder = chatPromptBuilder;
         this.citationMapper = citationMapper;
         this.chatModel = chatModel;
-        this.demoTokenService = demoTokenService;
+        this.demoSessionRedisService = demoSessionRedisService;
         this.demoRateLimiter = demoRateLimiter;
         this.configuredRepoFullName = configuredRepoFullName;
         this.maxMessages = maxMessages;
@@ -88,14 +88,19 @@ public class DemoChatService {
     }
 
     /**
-     * Returns the public status of the demo service.
+     * Returns the public status of the demo service, including IP-specific remaining messages if clientIp is known.
      */
-    public DemoStatusResponse getDemoStatus() {
+    public DemoStatusResponse getDemoStatus(String clientIp) {
         GitRepo repo = resolveDemoRepo();
         boolean ready = repo != null && repo.getIndexStatus() == IndexStatus.READY;
         String name = repo != null ? repo.getName() : "GitBot";
         String fullName = repo != null ? repo.getFullName() : configuredRepoFullName;
-        return new DemoStatusResponse(ready, name, fullName, maxMessages);
+        int remaining = demoSessionRedisService.getIpRemainingMessages(clientIp);
+        return new DemoStatusResponse(ready, name, fullName, maxMessages, remaining);
+    }
+
+    public DemoStatusResponse getDemoStatus() {
+        return getDemoStatus(null);
     }
 
     /**
@@ -114,19 +119,19 @@ public class DemoChatService {
             throw new BadRequestException("Message exceeds maximum length of " + maxMessageChars + " characters.");
         }
 
-        // 3. Demo token verification & increment
-        DemoTokenService.TokenResult tokenResult = demoTokenService.validateAndIncrement(request.demoToken());
-        if (httpResponse != null) {
-            httpResponse.setHeader("X-Demo-Token", tokenResult.nextToken());
-        }
-
-        // 4. Resolve fixed demo repository (strictly server-authoritative)
+        // 3. Resolve fixed demo repository (strictly server-authoritative) BEFORE consuming message quota
         GitRepo repo = resolveDemoRepo();
         if (repo == null) {
             throw new ConflictException("Demo repository is not registered in the system.");
         }
         if (repo.getIndexStatus() != IndexStatus.READY) {
             throw new ConflictException("Demo repository is currently not indexed.");
+        }
+
+        // 4. Demo session verification & atomic increment via Redis (authoritative per IP)
+        DemoSessionRedisService.DemoSessionResult sessionResult = demoSessionRedisService.getOrIncrementSession(request.demoToken(), clientIp);
+        if (httpResponse != null) {
+            httpResponse.setHeader("X-Demo-Token", sessionResult.token());
         }
 
         // 5. RAG retrieval strictly isolated to the demo repository
@@ -188,7 +193,7 @@ public class DemoChatService {
             emitter.send(
                     SseEmitter.event()
                             .name("demo_token")
-                            .data(tokenResult.nextToken())
+                            .data(sessionResult.token())
             );
 
             // Send transient user message response

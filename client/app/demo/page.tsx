@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
     ArrowLeft,
     Check,
+    ChevronDown,
     Copy,
     ExternalLink,
     FolderGit2,
@@ -32,7 +33,7 @@ import {
     MessageFooter,
     MessageGroup,
 } from "@/components/ui/message";
-import { getGithubLoginUrl, type ChatMessage } from "@/lib/api";
+import { api, ApiError, getGithubLoginUrl, type ChatMessage } from "@/lib/api";
 import { streamDemoChat } from "@/lib/stream-demo-chat";
 import { cn } from "@/lib/utils";
 
@@ -80,7 +81,10 @@ function copyToClipboard(text: string): Promise<boolean> {
     return Promise.resolve(false);
 }
 
+const emptySubscribe = () => () => {};
+
 export default function DemoPage() {
+    const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
     const [messages, setMessages] = useState<ChatMessage[]>(() => {
         if (typeof window === "undefined") return [];
         try {
@@ -112,8 +116,29 @@ export default function DemoPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const abortControllerRef = useRef<AbortController | null>(null);
-    const scrollViewportRef = useRef<HTMLDivElement>(null);
-    const isAtBottomRef = useRef(true);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [isScrolledUp, setIsScrolledUp] = useState(false);
+    const isScrolledUpRef = useRef(false);
+    const isProgrammaticScrollRef = useRef(false);
+    const prevMessageCountRef = useRef(messages.length);
+
+    // Sync authoritative IP demo remaining message count from backend on mount
+    useEffect(() => {
+        api.getDemoStatus()
+            .then((status) => {
+                if (typeof status.remainingMessages === "number") {
+                    const used = Math.max(0, MAX_DEMO_MESSAGES - status.remainingMessages);
+                    setMessageCount((prev) => {
+                        const updated = Math.max(prev, used);
+                        try {
+                            sessionStorage.setItem(STORAGE_KEYS.COUNT, updated.toString());
+                        } catch {}
+                        return updated;
+                    });
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // Sync updates to sessionStorage (browser tab scope only)
     const persistSession = useCallback((msgs: ChatMessage[], token: string | null, count: number) => {
@@ -130,14 +155,118 @@ export default function DemoPage() {
         }
     }, []);
 
-    // Auto-scroll when messages or stream change
+    // Attach scroll, wheel, and touch listeners to detect intentional user scrolling on viewport
     useEffect(() => {
-        if (!isAtBottomRef.current) return;
-        const viewport = scrollViewportRef.current;
-        if (viewport) {
-            viewport.scrollTop = viewport.scrollHeight;
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        const handleScroll = () => {
+            if (isProgrammaticScrollRef.current) {
+                isProgrammaticScrollRef.current = false;
+                return;
+            }
+
+            const distanceFromBottom =
+                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+
+            if (distanceFromBottom <= 35) {
+                if (isScrolledUpRef.current) {
+                    isScrolledUpRef.current = false;
+                    setIsScrolledUp(false);
+                }
+            } else if (distanceFromBottom > 45) {
+                if (!isScrolledUpRef.current) {
+                    isScrolledUpRef.current = true;
+                    setIsScrolledUp(true);
+                }
+            }
+        };
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY < 0) {
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+            }
+        };
+
+        const handleTouchMove = () => {
+            const distanceFromBottom =
+                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+            if (distanceFromBottom > 40) {
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+            }
+        };
+
+        viewport.addEventListener("scroll", handleScroll, { passive: true });
+        viewport.addEventListener("wheel", handleWheel, { passive: true });
+        viewport.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+        return () => {
+            viewport.removeEventListener("scroll", handleScroll);
+            viewport.removeEventListener("wheel", handleWheel);
+            viewport.removeEventListener("touchmove", handleTouchMove);
+        };
+    }, []);
+
+    // When the user submits a new prompt, take them to bottom initially and reset scroll intent
+    useEffect(() => {
+        const lastMsg = messages[messages.length - 1];
+        if (messages.length > prevMessageCountRef.current && lastMsg?.role === "USER") {
+            isScrolledUpRef.current = false;
+            setIsScrolledUp(false);
+            const container = scrollContainerRef.current;
+            const viewport = container?.querySelector(
+                '[data-slot="scroll-area-viewport"]'
+            ) as HTMLElement | null;
+            if (viewport) {
+                isProgrammaticScrollRef.current = true;
+                viewport.scrollTo({
+                    top: viewport.scrollHeight,
+                    behavior: "smooth",
+                });
+            }
         }
-    }, [messages, streamText]);
+        prevMessageCountRef.current = messages.length;
+    }, [messages]);
+
+    // Auto-scroll when new messages or tokens arrive, ONLY IF user hasn't scrolled up
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        if (!isScrolledUpRef.current) {
+            isProgrammaticScrollRef.current = true;
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior: streaming ? "instant" : "smooth",
+            });
+        }
+    }, [messages, streamText, streaming]);
+
+    function scrollToBottom() {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const viewport = container.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+        ) as HTMLElement | null;
+        if (!viewport) return;
+
+        isScrolledUpRef.current = false;
+        setIsScrolledUp(false);
+        isProgrammaticScrollRef.current = true;
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+    }
 
     const handleCopy = async (id: string, text: string) => {
         const ok = await copyToClipboard(text);
@@ -221,10 +350,10 @@ export default function DemoPage() {
                             return next;
                         });
                         setStreamText("");
+                        setStreaming(false);
                     },
                     onDone: () => {
                         setStreaming(false);
-                        persistSession(updatedMessages, activeToken, nextCount);
                     },
                     onError: (err) => {
                         setStreaming(false);
@@ -239,11 +368,24 @@ export default function DemoPage() {
         } catch (err: unknown) {
             setStreaming(false);
             const msg = err instanceof Error ? err.message : "Failed to send message";
-            toast.add({
-                title: "Error",
-                description: msg,
-                type: "error",
-            });
+            const isLimit =
+                msg.toLowerCase().includes("limit reached") ||
+                (err instanceof ApiError && err.status === 429);
+            if (isLimit) {
+                setMessageCount(MAX_DEMO_MESSAGES);
+                persistSession(messages, demoToken, MAX_DEMO_MESSAGES);
+                toast.add({
+                    title: "Demo limit reached",
+                    description: msg,
+                    type: "warning",
+                });
+            } else {
+                toast.add({
+                    title: "Error",
+                    description: msg,
+                    type: "error",
+                });
+            }
         }
     };
 
@@ -283,9 +425,13 @@ export default function DemoPage() {
                                             : "text-primary"
                                 )}
                             >
-                                {remainingMessages === 0
-                                    ? "Limit reached"
-                                    : `${remainingMessages} message${remainingMessages === 1 ? "" : "s"} left`}
+                                {mounted ? (
+                                    remainingMessages === 0
+                                        ? "Limit reached"
+                                        : `${remainingMessages} message${remainingMessages === 1 ? "" : "s"} left`
+                                ) : (
+                                    "5 messages left"
+                                )}
                             </span>
                         </div>
 
@@ -314,28 +460,29 @@ export default function DemoPage() {
                     <span
                         className={cn(
                             "font-medium",
-                            remainingMessages === 0 ? "text-destructive" : "text-foreground"
+                            mounted && remainingMessages === 0 ? "text-destructive" : "text-foreground"
                         )}
                     >
-                        {remainingMessages === 0 ? "0 / 5 remaining" : `${remainingMessages} / 5 remaining`}
+                        {mounted
+                            ? (remainingMessages === 0 ? "0 / 5 remaining" : `${remainingMessages} / 5 remaining`)
+                            : "5 / 5 remaining"}
                     </span>
                 </div>
             </header>
 
             {/* Conversation Area */}
-            <main className="relative flex flex-1 flex-col overflow-hidden">
-                <ScrollArea
-                    ref={scrollViewportRef}
-                    className="flex-1 px-4 py-6 sm:px-6"
-                    onScroll={(e) => {
-                        const target = e.currentTarget;
-                        const isBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 60;
-                        isAtBottomRef.current = isBottom;
-                    }}
-                >
-                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+            <main ref={scrollContainerRef} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                {/* Live region for screen readers */}
+                <div aria-live="polite" aria-atomic="true" className="sr-only">
+                    {streaming
+                        ? "GitBot is generating a response..."
+                        : "Response generation finished."}
+                </div>
+
+                <ScrollArea className="flex-1 min-h-0 min-w-0 w-full">
+                    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 transition-all">
                         {/* Empty State / Welcome Screen */}
-                        {messages.length === 0 && !streamText && (
+                        {messages.length === 0 && !streaming && (
                             <div className="my-auto flex flex-col items-center justify-center py-8 text-center animate-in fade-in-50 duration-300">
                                 <div className="mb-4 flex size-14 items-center justify-center rounded-2xl border border-border/60 bg-black shadow-md">
                                     <GitBotIcon className="size-14 rounded-2xl" />
@@ -404,7 +551,7 @@ export default function DemoPage() {
                         )}
 
                         {/* Messages List */}
-                        {messages.length > 0 && (
+                        {(messages.length > 0 || streaming) && (
                             <MessageGroup className="space-y-6">
                                 {messages.map((message) => {
                                     const isUser = message.role === "USER";
@@ -412,9 +559,14 @@ export default function DemoPage() {
                                         <Message
                                             key={message.id}
                                             align={isUser ? "end" : "start"}
-                                            className="group/msg relative w-full max-w-full"
+                                            className={cn(
+                                                "group/msg relative",
+                                                isUser
+                                                    ? "ml-auto max-w-[85%] sm:max-w-[78%] md:max-w-[72%] pr-1 sm:pr-2"
+                                                    : "w-full max-w-full"
+                                            )}
                                         >
-                                            <MessageAvatar>
+                                            <MessageAvatar className="self-start mt-0.5">
                                                 {isUser ? (
                                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-xs">
                                                         U
@@ -431,15 +583,16 @@ export default function DemoPage() {
                                                     variant={isUser ? "default" : "ghost"}
                                                     align={isUser ? "end" : "start"}
                                                     className={cn(
-                                                        "max-w-full",
-                                                        !isUser && "bg-transparent border-none shadow-none"
+                                                        !isUser
+                                                            ? "max-w-full bg-transparent border-none shadow-none"
+                                                            : "max-w-full rounded-2xl sm:rounded-3xl"
                                                     )}
                                                 >
                                                     <BubbleContent
                                                         className={cn(
-                                                            "w-full max-w-full",
-                                                            !isUser &&
-                                                            "px-1 py-1 bg-transparent border-none shadow-none text-foreground"
+                                                            !isUser
+                                                                ? "w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground"
+                                                                : "px-4 py-2.5"
                                                         )}
                                                     >
                                                         {isUser ? (
@@ -451,6 +604,33 @@ export default function DemoPage() {
                                                         )}
                                                     </BubbleContent>
                                                 </Bubble>
+
+                                                {/* User Message Actions (Copy prompt) */}
+                                                {isUser && (
+                                                    <div
+                                                        className={cn(
+                                                            "mt-1 flex min-h-7 flex-wrap items-center justify-end gap-1 text-muted-foreground",
+                                                            "opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+                                                        )}
+                                                        role="toolbar"
+                                                        aria-label="User message actions"
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-xs"
+                                                            onClick={() => void handleCopy(message.id, message.content)}
+                                                            aria-label={copiedId === message.id ? "Copied prompt to clipboard" : "Copy prompt"}
+                                                        >
+                                                            {copiedId === message.id ? (
+                                                                <Check className="size-3.5 text-emerald-500" />
+                                                            ) : (
+                                                                <Copy className="size-3.5" />
+                                                            )}
+                                                            <span className="ml-1">{copiedId === message.id ? "Copied" : "Copy"}</span>
+                                                        </Button>
+                                                    </div>
+                                                )}
 
                                                 {/* Citations Footer */}
                                                 {!isUser && message.citations?.length > 0 && (
@@ -485,10 +665,10 @@ export default function DemoPage() {
                                     );
                                 })}
 
-                                {/* Active Streaming Response Bubble */}
-                                {streamText && (
+                                {/* Active Streaming Response / Thinking Placeholder Bubble */}
+                                {streaming && (streamText || messages[messages.length - 1]?.role === "USER") && (
                                     <Message align="start" className="group/msg relative w-full max-w-full">
-                                        <MessageAvatar>
+                                        <MessageAvatar className="self-start mt-0.5">
                                             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent p-0">
                                                 <GitBotIcon className="size-8 rounded-lg" />
                                             </div>
@@ -500,7 +680,21 @@ export default function DemoPage() {
                                                 className="max-w-full bg-transparent border-none shadow-none"
                                             >
                                                 <BubbleContent className="w-full max-w-full px-1 py-1 bg-transparent border-none shadow-none text-foreground">
-                                                    <ChatMarkdown content={streamText} isStreaming />
+                                                    {streamText ? (
+                                                        <ChatMarkdown content={streamText} isStreaming />
+                                                    ) : (
+                                                        <div className="flex items-center gap-2.5 py-1.5 text-sm text-muted-foreground animate-in fade-in duration-200">
+                                                            <Sparkles className="size-4 text-primary animate-pulse shrink-0" />
+                                                            <span className="font-medium text-xs text-foreground/80">
+                                                                Searching codebase and preparing response
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                                <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                                <span className="size-1 rounded-full bg-primary/70 animate-bounce" style={{ animationDelay: "300ms" }} />
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </BubbleContent>
                                             </Bubble>
                                         </MessageContent>
@@ -537,6 +731,22 @@ export default function DemoPage() {
                         )}
                     </div>
                 </ScrollArea>
+
+                {/* Jump to latest button if user scrolled up */}
+                {isScrolledUp && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center z-20">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="pointer-events-auto gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur transition-transform hover:scale-105 active:scale-95"
+                            onClick={scrollToBottom}
+                            aria-label="Scroll to newest messages"
+                        >
+                            <ChevronDown className="size-3.5" />
+                            <span>{streaming ? "New response below" : "Jump to latest"}</span>
+                        </Button>
+                    </div>
+                )}
 
                 {/* Chat Composer */}
                 <ChatComposer

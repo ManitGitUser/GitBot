@@ -45,7 +45,7 @@ class DemoChatServiceTest {
     @Mock
     private ChatModel chatModel;
     @Mock
-    private DemoTokenService demoTokenService;
+    private DemoSessionRedisService demoSessionRedisService;
     @Mock
     private DemoRateLimiter demoRateLimiter;
 
@@ -70,7 +70,7 @@ class DemoChatServiceTest {
                 chatPromptBuilder,
                 citationMapper,
                 chatModel,
-                demoTokenService,
+                demoSessionRedisService,
                 demoRateLimiter,
                 "ManitGitUser/GitBot",
                 5,
@@ -81,6 +81,7 @@ class DemoChatServiceTest {
     @Test
     void getDemoStatus_returnsCorrectStatus() {
         when(gitRepoRepository.findFirstByIsDemoTrue()).thenReturn(Optional.of(demoRepo));
+        when(demoSessionRedisService.getIpRemainingMessages(null)).thenReturn(5);
 
         DemoStatusResponse status = demoChatService.getDemoStatus();
 
@@ -88,13 +89,14 @@ class DemoChatServiceTest {
         assertThat(status.repoName()).isEqualTo("GitBot");
         assertThat(status.repoFullName()).isEqualTo("ManitGitUser/GitBot");
         assertThat(status.maxMessages()).isEqualTo(5);
+        assertThat(status.remainingMessages()).isEqualTo(5);
     }
 
     @Test
     void streamDemoChat_resolvesDemoRepoAndPerformsIsolatedRag() {
         when(gitRepoRepository.findFirstByIsDemoTrue()).thenReturn(Optional.of(demoRepo));
-        when(demoTokenService.validateAndIncrement(null)).thenReturn(
-                new DemoTokenService.TokenResult("session-1", 1, 5, "token-1")
+        when(demoSessionRedisService.getOrIncrementSession(null, "127.0.0.1")).thenReturn(
+                new DemoSessionRedisService.DemoSessionResult("session-1", 1, 5, "token-1")
         );
 
         CitationDto citation = new CitationDto("src/main/App.java", 1, 10, "java", "ManitGitUser/GitBot");
@@ -142,14 +144,13 @@ class DemoChatServiceTest {
     void streamDemoChat_repoNotIndexed_throwsConflictException() {
         demoRepo.setIndexStatus(IndexStatus.PENDING);
         when(gitRepoRepository.findFirstByIsDemoTrue()).thenReturn(Optional.of(demoRepo));
-        when(demoTokenService.validateAndIncrement(any())).thenReturn(
-                new DemoTokenService.TokenResult("session-1", 1, 5, "token-1")
-        );
 
         DemoChatRequest request = new DemoChatRequest("Hello", List.of(), null);
 
         assertThatThrownBy(() -> demoChatService.streamDemoChat(request, "127.0.0.1", null))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("currently not indexed");
+
+        verify(demoSessionRedisService, never()).getOrIncrementSession(any());
     }
 }

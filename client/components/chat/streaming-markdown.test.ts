@@ -58,23 +58,39 @@ test("streaming markdown - handles incomplete code fence without throwing", () =
     assert.ok(blocks[1].startsWith("```java"));
 });
 
-test("streaming markdown - configuration contract for streaming vs completed state", () => {
-    // Verifies the prop contract between streaming and static modes
+test("streaming markdown - configuration contract for continuous rich text rendering", () => {
+    // Mode is streaming across both streaming and completed states so that remend is always
+    // active (repairing unclosed bold, code fences, etc. in real-time) and the component tree
+    // does not switch between streaming blocks and static single-markdown, preventing visual snapping.
     function getStreamdownConfig(isStreaming: boolean) {
         return {
-            mode: isStreaming ? "streaming" : "static",
+            mode: "streaming" as const,
             isAnimating: isStreaming,
-            caret: isStreaming ? "block" : undefined,
+            streamingClass: isStreaming ? "chat-markdown-streaming" : undefined,
         };
     }
 
     const streamingConfig = getStreamdownConfig(true);
     assert.strictEqual(streamingConfig.mode, "streaming");
     assert.strictEqual(streamingConfig.isAnimating, true);
-    assert.strictEqual(streamingConfig.caret, "block");
+    assert.strictEqual(streamingConfig.streamingClass, "chat-markdown-streaming");
 
     const completedConfig = getStreamdownConfig(false);
-    assert.strictEqual(completedConfig.mode, "static");
+    assert.strictEqual(completedConfig.mode, "streaming");
     assert.strictEqual(completedConfig.isAnimating, false);
-    assert.strictEqual(completedConfig.caret, undefined);
+    assert.strictEqual(completedConfig.streamingClass, undefined);
+});
+
+test("streaming markdown - remend repairs incomplete markdown tokens into complete syntax", async () => {
+    // Dynamically import remend (bundled with streamdown)
+    const { default: remend } = await import("remend");
+
+    // Unclosed bold
+    assert.strictEqual(remend("**Important"), "**Important**");
+
+    // Unclosed inline code
+    assert.strictEqual(remend("`ChatService"), "`ChatService`");
+
+    // Unclosed strikethrough
+    assert.strictEqual(remend("~~deprecated"), "~~deprecated~~");
 });

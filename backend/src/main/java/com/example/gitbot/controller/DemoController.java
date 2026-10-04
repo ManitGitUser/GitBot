@@ -20,8 +20,9 @@ public class DemoController {
     private final DemoChatService demoChatService;
 
     @GetMapping("/status")
-    public ResponseEntity<DemoStatusResponse> getDemoStatus() {
-        return ResponseEntity.ok(demoChatService.getDemoStatus());
+    public ResponseEntity<DemoStatusResponse> getDemoStatus(HttpServletRequest httpRequest) {
+        String clientIp = extractClientIp(httpRequest);
+        return ResponseEntity.ok(demoChatService.getDemoStatus(clientIp));
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -35,14 +36,6 @@ public class DemoController {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
         return request.getRemoteAddr();
     }
 }

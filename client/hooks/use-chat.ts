@@ -338,6 +338,7 @@ export function useStreamChat(sessionId: string | null) {
                             queryKey: [...queryKeys.chat.all, "recent-sessions"],
                         });
                         setStreamText("");
+                        setStreaming(false);
                     },
                     onError: (err) => {
                         toast.add({

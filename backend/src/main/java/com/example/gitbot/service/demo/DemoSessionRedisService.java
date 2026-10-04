@@ -142,17 +142,32 @@ public class DemoSessionRedisService {
             return new DemoSessionResult(sessionId, currentCount, maxMessages, token);
         }
 
-        // Subsequent message with existing token: verify token and update session
-        DemoTokenService.DemoTokenPayload payload = demoTokenService.parseAndVerify(rawToken.trim());
-        String sessionKey = SESSION_KEY_PREFIX + payload.id();
+        // Subsequent message with existing token: verify token and update session.
+        // If token or session in Redis expired, seamlessly create a fresh session for this IP
+        String sessionId;
+        String tokenToReturn;
+        try {
+            DemoTokenService.DemoTokenPayload payload = demoTokenService.parseAndVerify(rawToken.trim());
+            String sessionKey = SESSION_KEY_PREFIX + payload.id();
+            String existingSession = redisTemplate.opsForValue().get(sessionKey);
 
-        String existingSession = redisTemplate.opsForValue().get(sessionKey);
-        if (existingSession == null) {
-            throw new BadRequestException("Demo session expired or not found. Please refresh the page to start a new demo.");
+            if (existingSession != null) {
+                sessionId = payload.id();
+                tokenToReturn = rawToken;
+            } else {
+                sessionId = UUID.randomUUID().toString();
+                long exp = Instant.now().getEpochSecond() + tokenTtlSeconds;
+                tokenToReturn = demoTokenService.createToken(sessionId, exp);
+            }
+        } catch (Exception e) {
+            sessionId = UUID.randomUUID().toString();
+            long exp = Instant.now().getEpochSecond() + tokenTtlSeconds;
+            tokenToReturn = demoTokenService.createToken(sessionId, exp);
         }
 
+        String sessionKey = SESSION_KEY_PREFIX + sessionId;
         redisTemplate.opsForValue().set(sessionKey, String.valueOf(currentCount), Duration.ofSeconds(tokenTtlSeconds));
-        return new DemoSessionResult(payload.id(), currentCount, maxMessages, rawToken);
+        return new DemoSessionResult(sessionId, currentCount, maxMessages, tokenToReturn);
     }
 
     /**

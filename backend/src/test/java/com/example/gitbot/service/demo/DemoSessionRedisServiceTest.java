@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -308,5 +309,32 @@ class DemoSessionRedisServiceTest {
 
         // Remaining messages must remain 0
         assertThat(demoSessionRedisService.getIpRemainingMessages(testIp)).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Expired or missing session token rolls into fresh session if IP quota is available")
+    void expiredSessionToken_rollsIntoFreshSession_ifIpQuotaAvailable() {
+        String testIp = "192.0.2.150";
+        quotaKeysToClean.add("demo:quota:" + testIp);
+
+        // 1. Initial request from testIp
+        DemoSessionRedisService.DemoSessionResult msg1 = demoSessionRedisService.getOrIncrementSession(null, testIp);
+        sessionKeysToClean.add("demo:session:" + msg1.sessionId());
+        assertThat(msg1.currentMessageCount()).isEqualTo(1);
+
+        // 2. Simulate expired token from 6 hours ago
+        String expiredSessionId = UUID.randomUUID().toString();
+        long expiredTimestamp = Instant.now().getEpochSecond() - 21600; // 6 hours ago
+        String staleToken = demoTokenService.createToken(expiredSessionId, expiredTimestamp);
+
+        // 3. User presents staleToken with testIp (which still has 4 messages remaining)
+        // Must succeed and seamlessly issue a fresh session token!
+        DemoSessionRedisService.DemoSessionResult msg2 = demoSessionRedisService.getOrIncrementSession(staleToken, testIp);
+        sessionKeysToClean.add("demo:session:" + msg2.sessionId());
+
+        assertThat(msg2.currentMessageCount()).isEqualTo(2);
+        assertThat(msg2.token()).isNotEqualTo(staleToken);
+        assertThat(msg2.sessionId()).isNotEqualTo(expiredSessionId);
+        assertThat(demoSessionRedisService.getIpRemainingMessages(testIp)).isEqualTo(3);
     }
 }

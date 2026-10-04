@@ -130,13 +130,14 @@ export default function DemoPage() {
             .then((status) => {
                 if (typeof status.remainingMessages === "number") {
                     const used = Math.max(0, MAX_DEMO_MESSAGES - status.remainingMessages);
-                    setMessageCount((prev) => {
-                        const updated = Math.max(prev, used);
-                        try {
-                            sessionStorage.setItem(STORAGE_KEYS.COUNT, updated.toString());
-                        } catch {}
-                        return updated;
-                    });
+                    setMessageCount(used);
+                    try {
+                        sessionStorage.setItem(STORAGE_KEYS.COUNT, used.toString());
+                        if (status.remainingMessages === MAX_DEMO_MESSAGES) {
+                            sessionStorage.removeItem(STORAGE_KEYS.TOKEN);
+                            setDemoToken(null);
+                        }
+                    } catch {}
                 }
             })
             .catch(() => {});
@@ -435,6 +436,23 @@ export default function DemoPage() {
                     title: "Demo limit reached",
                     description: msg,
                     type: "warning",
+                });
+            } else if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("not found")) {
+                sessionStorage.removeItem(STORAGE_KEYS.TOKEN);
+                setDemoToken(null);
+                api.getDemoStatus().then((status) => {
+                    if (typeof status.remainingMessages === "number") {
+                        const used = Math.max(0, MAX_DEMO_MESSAGES - status.remainingMessages);
+                        setMessageCount(used);
+                        try {
+                            sessionStorage.setItem(STORAGE_KEYS.COUNT, used.toString());
+                        } catch {}
+                    }
+                }).catch(() => {});
+                toast.add({
+                    title: "Demo session refreshed",
+                    description: "Your previous demo session had expired. A fresh session is ready.",
+                    type: "info",
                 });
             } else {
                 toast.add({

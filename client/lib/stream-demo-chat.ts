@@ -81,20 +81,24 @@ export async function streamDemoChat(
             }
 
             const data = dataLines.join("\n");
-            if (!data) continue;
+            if (!data && (event !== "token" || dataLines.length === 0)) continue;
 
             try {
                 if (event === "demo_token") {
                     handlers.onDemoToken?.(data.trim());
                 } else if (event === "token") {
                     let tokenText = data;
-                    try {
-                        const parsed = JSON.parse(data);
-                        if (typeof parsed === "string") {
-                            tokenText = parsed;
+                    if (!data && dataLines.length > 0) {
+                        tokenText = " ";
+                    } else {
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (typeof parsed === "string") {
+                                tokenText = parsed;
+                            }
+                        } catch {
+                            // Plain text
                         }
-                    } catch {
-                        // Plain text
                     }
                     handlers.onToken?.(tokenText);
                 } else if (event === "user_message") {

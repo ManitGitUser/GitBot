@@ -23,9 +23,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.json.JsonMapper;
 import reactor.core.Disposable;
 
 import java.time.Instant;
@@ -53,6 +53,7 @@ public class DemoChatService {
     private final String configuredRepoFullName;
     private final int maxMessages;
     private final int maxMessageChars;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     public DemoChatService(
             GitRepoRepository gitRepoRepository,
@@ -222,10 +223,11 @@ public class DemoChatService {
                         if (completed.get()) return;
                         fullReply.append(token);
                         try {
+                            String jsonToken = jsonMapper.writeValueAsString(token);
                             emitter.send(
                                     SseEmitter.event()
                                             .name("token")
-                                            .data(token, MediaType.APPLICATION_JSON)
+                                            .data(jsonToken)
                             );
                         } catch (Exception ex) {
                             log.debug("Demo client disconnected while sending token");

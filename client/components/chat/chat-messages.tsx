@@ -260,9 +260,11 @@ export function ChatMessages({
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const isScrolledUpRef = useRef(false);
     const isProgrammaticScrollRef = useRef(false);
+    const lastUserUpScrollTimeRef = useRef(0);
+    const lastScrollTopRef = useRef(0);
     const prevMessageCountRef = useRef(messages.length);
 
-    // Attach scroll, wheel, and touch listeners to detect intentional user scrolling
+    // Attach scroll, wheel, touch, and key listeners to detect intentional user scrolling
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
@@ -272,23 +274,39 @@ export function ChatMessages({
         ) as HTMLElement | null;
         if (!viewport) return;
 
+        lastScrollTopRef.current = viewport.scrollTop;
+
         const handleScroll = () => {
+            const currentScrollTop = viewport.scrollTop;
+            const prevScrollTop = lastScrollTopRef.current;
+            lastScrollTopRef.current = currentScrollTop;
+
             if (isProgrammaticScrollRef.current) {
                 isProgrammaticScrollRef.current = false;
                 return;
             }
 
             const distanceFromBottom =
-                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+                viewport.scrollHeight - currentScrollTop - viewport.clientHeight;
 
-            // User is at/near the bottom (within 35px)
-            if (distanceFromBottom <= 35) {
-                if (isScrolledUpRef.current) {
-                    isScrolledUpRef.current = false;
-                    setIsScrolledUp(false);
+            // If user's scroll position moved upwards (e.g. trackpad swipe, dragging scrollbar, key navigation)
+            if (currentScrollTop < prevScrollTop && distanceFromBottom > 15) {
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+                lastUserUpScrollTimeRef.current = Date.now();
+                return;
+            }
+
+            // User is at/near the bottom (within 20px)
+            if (distanceFromBottom <= 20) {
+                // Only clear if the user wasn't actively scrolling up in the last 400ms
+                if (Date.now() - lastUserUpScrollTimeRef.current > 400) {
+                    if (isScrolledUpRef.current) {
+                        isScrolledUpRef.current = false;
+                        setIsScrolledUp(false);
+                    }
                 }
-            } else if (distanceFromBottom > 45) {
-                // User has scrolled away from bottom
+            } else if (distanceFromBottom > 35) {
                 if (!isScrolledUpRef.current) {
                     isScrolledUpRef.current = true;
                     setIsScrolledUp(true);
@@ -298,29 +316,60 @@ export function ChatMessages({
 
         const handleWheel = (e: WheelEvent) => {
             if (e.deltaY < 0) {
-                // Upward wheel event: user intentionally wants to read earlier content
+                // Upward wheel event: user intentionally scrolled up
                 isScrolledUpRef.current = true;
                 setIsScrolledUp(true);
+                lastUserUpScrollTimeRef.current = Date.now();
+            } else if (e.deltaY > 0) {
+                // Downward wheel event: check if user reached bottom
+                const distanceFromBottom =
+                    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+                if (distanceFromBottom <= 20) {
+                    isScrolledUpRef.current = false;
+                    setIsScrolledUp(false);
+                }
             }
         };
 
-        const handleTouchMove = () => {
-            const distanceFromBottom =
-                viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-            if (distanceFromBottom > 40) {
-                isScrolledUpRef.current = true;
-                setIsScrolledUp(true);
+        let touchStartY = 0;
+        const handleTouchStart = (e: TouchEvent) => {
+            if (e.touches[0]) {
+                touchStartY = e.touches[0].clientY;
             }
         };
 
+        const handleTouchMove = (e: TouchEvent) => {
+            if (e.touches[0]) {
+                const currentY = e.touches[0].clientY;
+                // Swiping downwards on screen (finger moving down) scrolls content UP
+                if (currentY > touchStartY + 5) {
+                    isScrolledUpRef.current = true;
+                    setIsScrolledUp(true);
+                    lastUserUpScrollTimeRef.current = Date.now();
+                }
+            }
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "ArrowUp" || e.key === "PageUp" || e.key === "Home") {
+                isScrolledUpRef.current = true;
+                setIsScrolledUp(true);
+                lastUserUpScrollTimeRef.current = Date.now();
+            }
+        };
+
+        container.addEventListener("wheel", handleWheel, { passive: true });
+        container.addEventListener("touchstart", handleTouchStart, { passive: true });
+        container.addEventListener("touchmove", handleTouchMove, { passive: true });
+        container.addEventListener("keydown", handleKeyDown, { passive: true });
         viewport.addEventListener("scroll", handleScroll, { passive: true });
-        viewport.addEventListener("wheel", handleWheel, { passive: true });
-        viewport.addEventListener("touchmove", handleTouchMove, { passive: true });
 
         return () => {
+            container.removeEventListener("wheel", handleWheel);
+            container.removeEventListener("touchstart", handleTouchStart);
+            container.removeEventListener("touchmove", handleTouchMove);
+            container.removeEventListener("keydown", handleKeyDown);
             viewport.removeEventListener("scroll", handleScroll);
-            viewport.removeEventListener("wheel", handleWheel);
-            viewport.removeEventListener("touchmove", handleTouchMove);
         };
     }, []);
 
@@ -341,6 +390,7 @@ export function ChatMessages({
                 const newScrollHeight = viewport.scrollHeight;
                 const delta = newScrollHeight - prevScrollHeight;
                 viewport.scrollTop = prevScrollTop + delta;
+                lastScrollTopRef.current = viewport.scrollTop;
             }
         });
     };
@@ -351,6 +401,7 @@ export function ChatMessages({
         if (messages.length > prevMessageCountRef.current && lastMsg?.role === "USER") {
             isScrolledUpRef.current = false;
             setIsScrolledUp(false);
+            lastUserUpScrollTimeRef.current = 0;
             const container = scrollContainerRef.current;
             const viewport = container?.querySelector(
                 '[data-slot="scroll-area-viewport"]'
@@ -361,6 +412,7 @@ export function ChatMessages({
                     top: viewport.scrollHeight,
                     behavior: "smooth",
                 });
+                lastScrollTopRef.current = viewport.scrollHeight;
             }
         }
         prevMessageCountRef.current = messages.length;
@@ -383,6 +435,7 @@ export function ChatMessages({
                 top: viewport.scrollHeight,
                 behavior: streaming ? "instant" : "smooth",
             });
+            lastScrollTopRef.current = viewport.scrollHeight;
         }
     }, [messages, streamText, streaming, isLoadingEarlier]);
 
@@ -396,8 +449,10 @@ export function ChatMessages({
 
         isScrolledUpRef.current = false;
         setIsScrolledUp(false);
+        lastUserUpScrollTimeRef.current = 0;
         isProgrammaticScrollRef.current = true;
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+        lastScrollTopRef.current = viewport.scrollHeight;
     }
 
     if (isLoading) {

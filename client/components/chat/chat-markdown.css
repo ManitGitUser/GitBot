@@ -40,6 +40,11 @@
     margin-top: 0;
 }
 
+.chat-markdown [data-sd-animate] {
+    display: inline;
+    white-space: pre-wrap;
+}
+
 .chat-markdown p {
     margin: 0.5rem 0;
 }

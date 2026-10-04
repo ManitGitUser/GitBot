@@ -18,9 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.json.JsonMapper;
 import reactor.core.Disposable;
 
 /**
@@ -37,6 +37,7 @@ public class ChatStreamHandler {
     private final ChatModel chatModel;
     private final ChatMessageRepository chatMessageRepository;
     private final CitationMapper citationMapper;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     private final ConcurrentHashMap<UUID, ActiveChatStream> activeStreams = new ConcurrentHashMap<>();
 
@@ -162,10 +163,11 @@ public class ChatStreamHandler {
         }
         stream.fullReply.append(token);
         try {
+            String jsonToken = jsonMapper.writeValueAsString(token);
             stream.emitter.send(
                     SseEmitter.event()
                             .name("token")
-                            .data(token, MediaType.APPLICATION_JSON)
+                            .data(jsonToken)
             );
         } catch (Exception ex) {
             log.debug("Client disconnected while sending token for session {}", stream.sessionId);

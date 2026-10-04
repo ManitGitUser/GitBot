@@ -134,3 +134,9 @@ Open `http://localhost:3000` in your browser.
 * **Extended Multi-Branch Context**: Deep cross-branch comparison and semantic merge conflict analysis.
 * **Granular Database Migrations**: Transition from Hibernate `ddl-auto: update` to formal Flyway versioned migrations for team-based schema evolution.
 * **Custom Model Providers**: Optional support for alternative local/cloud LLM providers via Spring AI abstraction.
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE.md](LICENSE.md) file for details.

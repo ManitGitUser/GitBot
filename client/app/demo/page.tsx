@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ArrowLeft,
     Check,
@@ -81,36 +81,11 @@ function copyToClipboard(text: string): Promise<boolean> {
     return Promise.resolve(false);
 }
 
-const emptySubscribe = () => () => {};
-
 export default function DemoPage() {
-    const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
-    const [messages, setMessages] = useState<ChatMessage[]>(() => {
-        if (typeof window === "undefined") return [];
-        try {
-            const saved = sessionStorage.getItem(STORAGE_KEYS.MESSAGES);
-            return saved ? (JSON.parse(saved) as ChatMessage[]) : [];
-        } catch {
-            return [];
-        }
-    });
-    const [demoToken, setDemoToken] = useState<string | null>(() => {
-        if (typeof window === "undefined") return null;
-        try {
-            return sessionStorage.getItem(STORAGE_KEYS.TOKEN);
-        } catch {
-            return null;
-        }
-    });
-    const [messageCount, setMessageCount] = useState<number>(() => {
-        if (typeof window === "undefined") return 0;
-        try {
-            const saved = sessionStorage.getItem(STORAGE_KEYS.COUNT);
-            return saved ? parseInt(saved, 10) || 0 : 0;
-        } catch {
-            return 0;
-        }
-    });
+    const [mounted, setMounted] = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [demoToken, setDemoToken] = useState<string | null>(null);
+    const [messageCount, setMessageCount] = useState<number>(0);
     const [streamText, setStreamText] = useState<string>("");
     const [streaming, setStreaming] = useState<boolean>(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -122,10 +97,36 @@ export default function DemoPage() {
     const isProgrammaticScrollRef = useRef(false);
     const lastUserUpScrollTimeRef = useRef(0);
     const lastScrollTopRef = useRef(0);
-    const prevMessageCountRef = useRef(messages.length);
+    const prevMessageCountRef = useRef(0);
 
-    // Sync authoritative IP demo remaining message count from backend on mount
+    // Hydrate tab-scoped demo state from sessionStorage after hydration and sync with backend
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setMounted(true);
+            try {
+                const savedMessages = sessionStorage.getItem(STORAGE_KEYS.MESSAGES);
+                if (savedMessages) {
+                    const parsed = JSON.parse(savedMessages) as ChatMessage[];
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed);
+                    }
+                }
+                const savedToken = sessionStorage.getItem(STORAGE_KEYS.TOKEN);
+                if (savedToken) {
+                    setDemoToken(savedToken);
+                }
+                const savedCount = sessionStorage.getItem(STORAGE_KEYS.COUNT);
+                if (savedCount) {
+                    const parsedCount = parseInt(savedCount, 10);
+                    if (!Number.isNaN(parsedCount) && parsedCount >= 0) {
+                        setMessageCount(parsedCount);
+                    }
+                }
+            } catch {
+                // Ignore sessionStorage read errors
+            }
+        }, 0);
+
         api.getDemoStatus()
             .then((status) => {
                 if (typeof status.remainingMessages === "number") {
@@ -141,6 +142,8 @@ export default function DemoPage() {
                 }
             })
             .catch(() => {});
+
+        return () => clearTimeout(timer);
     }, []);
 
     // Sync updates to sessionStorage (browser tab scope only)
@@ -493,9 +496,9 @@ export default function DemoPage() {
                             <span
                                 className={cn(
                                     "font-semibold",
-                                    remainingMessages === 0
+                                    mounted && remainingMessages === 0
                                         ? "text-destructive"
-                                        : remainingMessages <= 2
+                                        : mounted && remainingMessages <= 2
                                             ? "text-amber-500"
                                             : "text-primary"
                                 )}

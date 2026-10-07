@@ -55,13 +55,14 @@ spring:
             user-name-attribute: id
 
 server:
+  port: ${PORT:8080}
   forward-headers-strategy: native
   servlet:
     session:
       cookie:
         name: GITBOT_SESSION
         http-only: true
-        same-site: lax
+        same-site: ${SESSION_COOKIE_SAMESITE:lax}
         secure: ${SESSION_COOKIE_SECURE:false}
       timeout: 7d
 

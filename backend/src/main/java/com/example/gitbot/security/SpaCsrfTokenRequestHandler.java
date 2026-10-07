@@ -22,8 +22,20 @@ public final class SpaCsrfTokenRequestHandler extends CsrfTokenRequestAttributeH
     @Override
     public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
         String headerValue = request.getHeader(csrfToken.getHeaderName());
-        return (StringUtils.hasText(headerValue))
-                ? super.resolveCsrfTokenValue(request, csrfToken)
-                : this.delegate.resolveCsrfTokenValue(request, csrfToken);
+        /*
+         * When the CSRF header is present, it may contain either:
+         * 1. A masked XOR token (obtained via GET /api/auth/csrf by cross-origin SPA)
+         * 2. A raw token (obtained via document.cookie by same-origin SPA / local client)
+         *
+         * Try resolving via the XOR delegate first. If unmasking fails (e.g. token is raw),
+         * fall back to the raw header value via super.
+         *
+         * If no header is present, delegate handles request parameters.
+         */
+        if (StringUtils.hasText(headerValue)) {
+            String resolved = this.delegate.resolveCsrfTokenValue(request, csrfToken);
+            return (resolved != null) ? resolved : super.resolveCsrfTokenValue(request, csrfToken);
+        }
+        return this.delegate.resolveCsrfTokenValue(request, csrfToken);
     }
 }

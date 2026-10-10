@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="100%" height="100%" style="background:#090d16; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="ingressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#6d28d9" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="appGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#047857" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="extGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#be185d" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#64748b" />
+    </marker>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arrow-sky" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+  </defs>
+
+  <!-- Canvas Header -->
+  <text x="50" y="48" fill="#f8fafc" font-size="24" font-weight="700" letter-spacing="-0.5">GitBot — High-Level Design (HLD)</text>
+  <text x="50" y="74" fill="#94a3b8" font-size="13">End-to-End Distributed Architecture, Ingress Routing, Isolation Boundaries &amp; Data Flows</text>
+  <rect x="1040" y="32" width="110" height="26" rx="6" fill="#1e293b" stroke="#334155"/>
+  <text x="1095" y="49" fill="#38bdf8" font-size="11" font-weight="600" text-anchor="middle">v1.0 Production</text>
+
+  <!-- 1. CLIENT TIER -->
+  <g transform="translate(50, 110)">
+    <rect width="250" height="560" rx="14" fill="url(#clientGrad)" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="16" y="16" width="218" height="34" rx="8" fill="#0369a1" fill-opacity="0.3"/>
+    <text x="28" y="38" fill="#38bdf8" font-size="13" font-weight="700">CLIENT TIER (Vercel Edge)</text>
+    
+    <!-- User Node -->
+    <rect x="20" y="70" width="210" height="70" rx="10" fill="#0f172a" stroke="#1e293b"/>
+    <circle cx="45" cy="105" r="14" fill="#0284c7" fill-opacity="0.3"/>
+    <text x="45" y="110" fill="#38bdf8" font-size="14" text-anchor="middle">👤</text>
+    <text x="70" y="98" fill="#f1f5f9" font-size="13" font-weight="600">Developer Browser</text>
+    <text x="70" y="116" fill="#64748b" font-size="11">Next.js App Router (React 19)</text>
+
+    <!-- UI Modules -->
+    <rect x="20" y="155" width="210" height="385" rx="10" fill="#0f172a" stroke="#1e293b"/>
+    <text x="35" y="182" fill="#94a3b8" font-size="11" font-weight="700" letter-spacing="0.5">FRONTEND COMPONENTS</text>
+    
+    <rect x="32" y="196" width="186" height="52" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="44" y="218" fill="#e2e8f0" font-size="12" font-weight="600">Repository Dashboard</text>
+    <text x="44" y="235" fill="#94a3b8" font-size="10">Sync, Index trigger &amp; Polling</text>
+
+    <rect x="32" y="260" width="186" height="64" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="44" y="282" fill="#e2e8f0" font-size="12" font-weight="600">Chat &amp; SSE Stream Reader</text>
+    <text x="44" y="299" fill="#94a3b8" font-size="10">Fetch API ReadableStream</text>
+    <text x="44" y="313" fill="#38bdf8" font-size="10">Progressive Streamdown parser</text>
+
+    <rect x="32" y="336" width="186" height="52" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="44" y="358" fill="#e2e8f0" font-size="12" font-weight="600">CSRF &amp; Auth Handlers</text>
+    <text x="44" y="375" fill="#94a3b8" font-size="10">Auto-fetches XSRF-TOKEN cookie</text>
+
+    <rect x="32" y="400" width="186" height="52" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="44" y="422" fill="#e2e8f0" font-size="12" font-weight="600">Anonymous Demo Sandbox</text>
+    <text x="44" y="439" fill="#94a3b8" font-size="10">Session-stored quota tracking</text>
+
+    <rect x="32" y="464" width="186" height="58" rx="6" fill="#0369a1" fill-opacity="0.2" stroke="#0284c7" stroke-dasharray="3 3"/>
+    <text x="44" y="485" fill="#38bdf8" font-size="11" font-weight="600">Host Domain: gitbot.in</text>
+    <text x="44" y="502" fill="#94a3b8" font-size="10">Vercel Global Edge Network</text>
+  </g>
+
+  <!-- 2. INGRESS & GATEWAY TIER -->
+  <g transform="translate(330, 110)">
+    <rect width="180" height="560" rx="14" fill="url(#ingressGrad)" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="14" y="16" width="152" height="34" rx="8" fill="#6d28d9" fill-opacity="0.3"/>
+    <text x="24" y="38" fill="#c084fc" font-size="12" font-weight="700">INGRESS GATEWAY</text>
+
+    <rect x="15" y="70" width="150" height="470" rx="10" fill="#0f172a" stroke="#1e293b"/>
+    <text x="25" y="98" fill="#f1f5f9" font-size="13" font-weight="600">Nginx Reverse Proxy</text>
+    <text x="25" y="115" fill="#94a3b8" font-size="11">api.gitbot.in (Port 443)</text>
+
+    <rect x="25" y="135" width="130" height="60" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="33" y="155" fill="#c084fc" font-size="11" font-weight="600">TLS Termination</text>
+    <text x="33" y="172" fill="#94a3b8" font-size="10">Let's Encrypt Certbot</text>
+    <text x="33" y="185" fill="#94a3b8" font-size="10">Automated Webroot</text>
+
+    <rect x="25" y="210" width="130" height="75" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="33" y="230" fill="#c084fc" font-size="11" font-weight="600">SSE Direct Pass</text>
+    <text x="33" y="247" fill="#10b981" font-size="10">proxy_buffering off</text>
+    <text x="33" y="261" fill="#94a3b8" font-size="10">Chunked Transfer</text>
+    <text x="33" y="275" fill="#94a3b8" font-size="10">300s read_timeout</text>
+
+    <rect x="25" y="300" width="130" height="70" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="33" y="320" fill="#c084fc" font-size="11" font-weight="600">Header Injection</text>
+    <text x="33" y="337" fill="#94a3b8" font-size="10">X-Forwarded-Proto</text>
+    <text x="33" y="351" fill="#94a3b8" font-size="10">X-Forwarded-Host</text>
+    <text x="33" y="365" fill="#94a3b8" font-size="10">X-Real-IP</text>
+
+    <rect x="25" y="385" width="130" height="65" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="33" y="405" fill="#c084fc" font-size="11" font-weight="600">Security Perimeter</text>
+    <text x="33" y="422" fill="#94a3b8" font-size="10">Only 80/443 exposed</text>
+    <text x="33" y="436" fill="#ef4444" font-size="10">Internal DB blocked</text>
+  </g>
+
+  <!-- 3. BACKEND APPLICATION TIER -->
+  <g transform="translate(540, 110)">
+    <rect width="320" height="560" rx="14" fill="url(#appGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="16" y="16" width="288" height="34" rx="8" fill="#047857" fill-opacity="0.3"/>
+    <text x="28" y="38" fill="#34d399" font-size="13" font-weight="700">APPLICATION TIER (Spring Boot 4.1.1)</text>
+
+    <!-- JVM Card -->
+    <rect x="20" y="65" width="280" height="50" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="86" fill="#f1f5f9" font-size="12" font-weight="600">Java 25 Runtime (Temurin)</text>
+    <text x="32" y="103" fill="#10b981" font-size="10">-XX:+UseSerialGC • -Xms160m -Xmx200m • MALLOC_ARENA_MAX=2</text>
+
+    <!-- Core Subsystems -->
+    <rect x="20" y="125" width="280" height="75" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="145" fill="#34d399" font-size="12" font-weight="600">Security &amp; Auth Core</text>
+    <text x="32" y="162" fill="#94a3b8" font-size="10">• GitHub OAuth2 Client Flow (read:user, repo)</text>
+    <text x="32" y="176" fill="#94a3b8" font-size="10">• SpaCsrfTokenRequestHandler (XOR unmasking)</text>
+    <text x="32" y="190" fill="#94a3b8" font-size="10">• AES-256 Token Encryption (TextEncryptor)</text>
+
+    <rect x="20" y="210" width="280" height="95" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="230" fill="#34d399" font-size="12" font-weight="600">Async Indexing Pipeline</text>
+    <text x="32" y="247" fill="#94a3b8" font-size="10">• @Async("indexingExecutor") [Core:1, Max:2, Q:25]</text>
+    <text x="32" y="261" fill="#94a3b8" font-size="10">• CodeFileFilter (Binary, vendor, size &lt; 100KB)</text>
+    <text x="32" y="275" fill="#94a3b8" font-size="10">• CodeChunker (60 lines, 10 overlap, &lt; 1500 chars)</text>
+    <text x="32" y="289" fill="#94a3b8" font-size="10">• Batch Embeddings (VECTOR_BATCH_SIZE = 16)</text>
+
+    <rect x="20" y="315" width="280" height="95" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="335" fill="#34d399" font-size="12" font-weight="600">RAG &amp; Semantic Retrieval Engine</text>
+    <text x="32" y="352" fill="#94a3b8" font-size="10">• Repository Metadata Filter (repoId strict isolation)</text>
+    <text x="32" y="366" fill="#94a3b8" font-size="10">• HNSW Cosine Similarity Top-5 (PgVectorStore)</text>
+    <text x="32" y="380" fill="#94a3b8" font-size="10">• Neighboring Chunk Expansion (chunkIndex ± 1)</text>
+    <text x="32" y="394" fill="#94a3b8" font-size="10">• Lexical SQL Fallback &amp; XML Prompt Builder</text>
+
+    <rect x="20" y="420" width="280" height="60" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="440" fill="#34d399" font-size="12" font-weight="600">Streaming Controller &amp; SSE Bridge</text>
+    <text x="32" y="457" fill="#94a3b8" font-size="10">• Project Reactor Flux &lt;ChatResponse&gt; → SseEmitter</text>
+    <text x="32" y="471" fill="#94a3b8" font-size="10">• Discrete Events: token, citations, done, error</text>
+
+    <rect x="20" y="490" width="280" height="40" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="32" y="514" fill="#94a3b8" font-size="11">HikariCP Pool: max 5 conns • Tomcat: max 20 threads</text>
+  </g>
+
+  <!-- 4. DATA & CACHE TIER -->
+  <g transform="translate(890, 110)">
+    <rect width="260" height="270" rx="14" fill="url(#dbGrad)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="14" y="16" width="232" height="34" rx="8" fill="#b45309" fill-opacity="0.3"/>
+    <text x="24" y="38" fill="#fbbf24" font-size="13" font-weight="700">PERSISTENCE TIER (Internal)</text>
+
+    <!-- Postgres -->
+    <rect x="15" y="65" width="230" height="110" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="25" y="86" fill="#f1f5f9" font-size="12" font-weight="600">PostgreSQL 16 + pgvector</text>
+    <text x="25" y="103" fill="#94a3b8" font-size="10">• Relational: users, git_repositories, chat</text>
+    <text x="25" y="117" fill="#94a3b8" font-size="10">• Vector Table: vector_store (1536 dims)</text>
+    <text x="25" y="131" fill="#f59e0b" font-size="10">• HNSW Index: COSINE_DISTANCE</text>
+    <text x="25" y="145" fill="#94a3b8" font-size="10">• Port 5432 (Internal Docker Network)</text>
+
+    <!-- Valkey/Redis -->
+    <rect x="15" y="185" width="230" height="75" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="25" y="205" fill="#f1f5f9" font-size="12" font-weight="600">Valkey 8 / Redis (In-Memory)</text>
+    <text x="25" y="222" fill="#94a3b8" font-size="10">• Demo Quotas: 5 msgs / 2h TTL</text>
+    <text x="25" y="236" fill="#94a3b8" font-size="10">• IP Rate Limiting: 20 reqs / min</text>
+    <text x="25" y="250" fill="#94a3b8" font-size="10">• 0 Database writes for demo visits</text>
+  </g>
+
+  <!-- 5. EXTERNAL SERVICES -->
+  <g transform="translate(890, 400)">
+    <rect width="260" height="270" rx="14" fill="url(#extGrad)" stroke="#ec4899" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="14" y="16" width="232" height="34" rx="8" fill="#be185d" fill-opacity="0.3"/>
+    <text x="24" y="38" fill="#f472b6" font-size="13" font-weight="700">EXTERNAL CLOUD APIS</text>
+
+    <!-- GitHub -->
+    <rect x="15" y="65" width="230" height="90" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="25" y="86" fill="#f1f5f9" font-size="12" font-weight="600">GitHub REST API v3</text>
+    <text x="25" y="103" fill="#94a3b8" font-size="10">• OAuth2 Token Exchange &amp; User Profile</text>
+    <text x="25" y="117" fill="#94a3b8" font-size="10">• Recursive Tree Fetch: GET /git/trees</text>
+    <text x="25" y="131" fill="#94a3b8" font-size="10">• Raw Blob Ingestion &amp; Commit SHA Verification</text>
+
+    <!-- OpenAI -->
+    <rect x="15" y="165" width="230" height="90" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="25" y="186" fill="#f1f5f9" font-size="12" font-weight="600">OpenAI API</text>
+    <text x="25" y="203" fill="#94a3b8" font-size="10">• text-embedding-3-small (1536 dims)</text>
+    <text x="25" y="217" fill="#94a3b8" font-size="10">• gpt-4o-mini (Streaming Chat Completion)</text>
+    <text x="25" y="231" fill="#94a3b8" font-size="10">• Token-level Server-Sent Events output</text>
+  </g>
+
+  <!-- Connectors / Directional Arrows -->
+  <path d="M 300 240 L 330 240" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-sky)"/>
+  <text x="315" y="232" fill="#38bdf8" font-size="9" text-anchor="middle">HTTPS</text>
+
+  <path d="M 510 240 L 540 240" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="525" y="232" fill="#8b5cf6" font-size="9" text-anchor="middle">:8080</text>
+
+  <path d="M 860 220 L 890 220" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="875" y="212" fill="#f59e0b" font-size="9" text-anchor="middle">JDBC</text>
+
+  <path d="M 860 300 L 890 300" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="875" y="292" fill="#f59e0b" font-size="9" text-anchor="middle">Redis</text>
+
+  <path d="M 860 480 L 890 480" stroke="#ec4899" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="875" y="472" fill="#ec4899" font-size="9" text-anchor="middle">HTTPS</text>
+
+  <path d="M 860 550 L 890 550" stroke="#ec4899" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="875" y="542" fill="#ec4899" font-size="9" text-anchor="middle">Stream</text>
+
+  <!-- Reverse SSE return path -->
+  <path d="M 540 450 L 510 450" stroke="#10b981" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow-emerald)"/>
+  <path d="M 330 450 L 300 450" stroke="#10b981" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow-emerald)"/>
+  <text x="420" y="442" fill="#10b981" font-size="10" font-weight="600" text-anchor="middle">Real-time SSE Event Stream (Unbuffered)</text>
+</svg>

@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" width="100%" height="100%" style="background:#090d16; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow-chat" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arr-c-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#0284c7" />
+    </marker>
+    <marker id="arr-c-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arr-c-amber" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#f59e0b" />
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <text x="40" y="44" fill="#f8fafc" font-size="22" font-weight="700" letter-spacing="-0.5">GitBot — Real-Time Chat &amp; SSE Streaming Lifecycle</text>
+  <text x="40" y="68" fill="#94a3b8" font-size="12">Interactive Sequence Flow from Client Fetch Reader to OpenAI Reactive Stream &amp; Persistent Storage</text>
+  <rect x="1040" y="30" width="120" height="24" rx="6" fill="#1e293b" stroke="#334155"/>
+  <text x="1100" y="46" fill="#10b981" font-size="11" font-weight="600" text-anchor="middle">text/event-stream</text>
+
+  <!-- LIFELINE HEADERS -->
+  <g transform="translate(60, 95)">
+    <!-- Lifeline 1: Client -->
+    <rect x="0" y="0" width="160" height="42" rx="8" fill="#0284c7" fill-opacity="0.2" stroke="#0284c7"/>
+    <text x="80" y="26" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">1. Next.js Client</text>
+    <line x1="80" y1="42" x2="80" y2="620" stroke="#334155" stroke-dasharray="4 4"/>
+
+    <!-- Lifeline 2: Ingress / Nginx -->
+    <rect x="230" y="0" width="160" height="42" rx="8" fill="#8b5cf6" fill-opacity="0.2" stroke="#8b5cf6"/>
+    <text x="310" y="26" fill="#c084fc" font-size="12" font-weight="700" text-anchor="middle">2. Nginx Ingress</text>
+    <line x1="310" y1="42" x2="310" y2="620" stroke="#334155" stroke-dasharray="4 4"/>
+
+    <!-- Lifeline 3: Spring Boot Controller -->
+    <rect x="460" y="0" width="180" height="42" rx="8" fill="#10b981" fill-opacity="0.2" stroke="#10b981"/>
+    <text x="550" y="26" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle">3. ChatController &amp; SSE</text>
+    <line x1="550" y1="42" x2="550" y2="620" stroke="#334155" stroke-dasharray="4 4"/>
+
+    <!-- Lifeline 4: RAG & pgvector -->
+    <rect x="710" y="0" width="180" height="42" rx="8" fill="#f59e0b" fill-opacity="0.2" stroke="#f59e0b"/>
+    <text x="800" y="26" fill="#fbbf24" font-size="12" font-weight="700" text-anchor="middle">4. pgvector Retriever</text>
+    <line x1="800" y1="42" x2="800" y2="620" stroke="#334155" stroke-dasharray="4 4"/>
+
+    <!-- Lifeline 5: OpenAI API -->
+    <rect x="940" y="0" width="160" height="42" rx="8" fill="#ec4899" fill-opacity="0.2" stroke="#ec4899"/>
+    <text x="1020" y="26" fill="#f472b6" font-size="12" font-weight="700" text-anchor="middle">5. OpenAI gpt-4o-mini</text>
+    <line x1="1020" y1="42" x2="1020" y2="620" stroke="#334155" stroke-dasharray="4 4"/>
+  </g>
+
+  <!-- SEQUENCE STEPS -->
+  <g transform="translate(60, 160)">
+    <!-- 1. POST Chat Prompt -->
+    <path d="M 80 20 L 305 20" stroke="#38bdf8" stroke-width="2" marker-end="url(#arr-c-blue)"/>
+    <text x="190" y="14" fill="#38bdf8" font-size="10" font-weight="600" text-anchor="middle">POST /api/repos/{id}/chat (Cookie + X-XSRF-TOKEN)</text>
+
+    <!-- 2. Forward to Spring Boot -->
+    <path d="M 310 35 L 545 35" stroke="#c084fc" stroke-width="2" marker-end="url(#arr-c-blue)"/>
+    <text x="425" y="30" fill="#c084fc" font-size="10" font-weight="600" text-anchor="middle">proxy_pass :8080 (Forwarded Proto/Host)</text>
+
+    <!-- 3. Validation Box at Controller -->
+    <rect x="520" y="50" width="60" height="45" rx="4" fill="#1e293b" stroke="#10b981"/>
+    <text x="550" y="65" fill="#10b981" font-size="9" text-anchor="middle">Unmask CSRF</text>
+    <text x="550" y="77" fill="#94a3b8" font-size="8" text-anchor="middle">Auth Verify</text>
+    <text x="550" y="89" fill="#94a3b8" font-size="8" text-anchor="middle">indexStatus == READY</text>
+
+    <!-- 4. Query pgvector for Context -->
+    <path d="M 550 110 L 795 110" stroke="#f59e0b" stroke-width="2" marker-end="url(#arr-c-amber)"/>
+    <text x="670" y="104" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">Find Similar Chunks (repoId filter, Cosine top-5)</text>
+
+    <!-- 5. Return Chunks + Expand Neighbors -->
+    <path d="M 795 135 L 555 135" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3 3" marker-end="url(#arr-c-amber)"/>
+    <text x="670" y="130" fill="#94a3b8" font-size="9" text-anchor="middle">Return Chunks + Adjacent (chunkIndex ± 1)</text>
+
+    <!-- 6. Initialize SseEmitter and Subscribe to OpenAI -->
+    <path d="M 550 160 L 1015 160" stroke="#ec4899" stroke-width="2" marker-end="url(#arr-c-blue)"/>
+    <text x="780" y="154" fill="#f472b6" font-size="10" font-weight="600" text-anchor="middle">streamChatCompletion(promptWithXmlSources) → Flux&lt;ChatResponse&gt;</text>
+
+    <!-- 7. Initial Handshake HTTP 200 text/event-stream back to Client -->
+    <path d="M 545 185 L 315 185" stroke="#10b981" stroke-width="2" marker-end="url(#arr-c-green)"/>
+    <path d="M 305 185 L 85 185" stroke="#10b981" stroke-width="2" marker-end="url(#arr-c-green)"/>
+    <text x="195" y="179" fill="#10b981" font-size="10" font-weight="700" text-anchor="middle">HTTP 200 text/event-stream (Unbuffered)</text>
+
+    <!-- 8. SSE Event: assistant_message -->
+    <path d="M 545 220 L 85 220" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arr-c-green)"/>
+    <text x="310" y="214" fill="#94a3b8" font-size="9" font-family="monospace" text-anchor="middle">event: assistant_message  data: {"messageId":"UUID","role":"assistant"}</text>
+
+    <!-- 9. SSE Streaming Loop: tokens -->
+    <rect x="70" y="235" width="960" height="110" rx="8" fill="#1e293b" fill-opacity="0.5" stroke="#10b981" stroke-dasharray="4 4"/>
+    <text x="85" y="252" fill="#10b981" font-size="10" font-weight="700">CONTINUOUS TOKEN STREAMING LOOP (Reactive Non-Blocking Flux)</text>
+
+    <path d="M 1015 270 L 555 270" stroke="#ec4899" stroke-width="1.5" marker-end="url(#arr-c-blue)"/>
+    <text x="785" y="265" fill="#f472b6" font-size="9" text-anchor="middle">Flux token delta: "To"</text>
+    <path d="M 545 285 L 85 285" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr-c-green)"/>
+    <text x="315" y="280" fill="#34d399" font-size="9" font-family="monospace" text-anchor="middle">event: token  data: {"token":"To"}</text>
+
+    <path d="M 1015 310 L 555 310" stroke="#ec4899" stroke-width="1.5" marker-end="url(#arr-c-blue)"/>
+    <text x="785" y="305" fill="#f472b6" font-size="9" text-anchor="middle">Flux token delta: " authenticate..."</text>
+    <path d="M 545 325 L 85 325" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr-c-green)"/>
+    <text x="315" y="320" fill="#34d399" font-size="9" font-family="monospace" text-anchor="middle">event: token  data: {"token":" authenticate..."}</text>
+
+    <!-- 10. SSE Event: citations -->
+    <path d="M 545 365 L 85 365" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#arr-c-green)"/>
+    <text x="310" y="359" fill="#fbbf24" font-size="9" font-family="monospace" text-anchor="middle">event: citations  data: [{"filePath":"src/App.java","lines":"1-40"}]</text>
+
+    <!-- 11. SSE Event: done -->
+    <path d="M 545 395 L 85 395" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr-c-green)"/>
+    <text x="310" y="389" fill="#38bdf8" font-size="9" font-family="monospace" text-anchor="middle">event: done  data: {"finishReason":"STOP","promptTokens":1240,"completionTokens":180}</text>
+
+    <!-- 12. Asynchronous DB Persistence -->
+    <path d="M 550 430 L 795 430" stroke="#f59e0b" stroke-width="2" marker-end="url(#arr-c-amber)"/>
+    <text x="670" y="424" fill="#fbbf24" font-size="9" font-weight="600" text-anchor="middle">Async DB Write: Save ChatMessage turn &amp; Citations JSON</text>
+
+    <!-- Client-Side Progressive Markdown Rendering Feature Box -->
+    <rect x="20" y="465" width="1060" height="85" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="35" y="488" fill="#38bdf8" font-size="11" font-weight="700">CLIENT STREAMDOWN RECOVERY &amp; AUTOSCROLL CONTRACT</text>
+    <text x="35" y="508" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">Preserved Whitespace</tspan>: JSON-encoded tokens preserve leading/trailing spaces and code indents without collapsing.</text>
+    <text x="35" y="524" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">Remend Grammar Healing</tspan>: Incomplete markdown code blocks (e.g. open ```java fences) are repaired dynamically during stream.</text>
+    <text x="35" y="540" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">Scroll Lock Protection</tspan>: When developer scrolls up &gt; 15px to inspect earlier code, auto-scroll unlocks so user is never dragged down.</text>
+  </g>
+</svg>

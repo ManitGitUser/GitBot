@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%" style="background:#090d16; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <linearGradient id="sysEdgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="sysBackendGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#047857" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="sysDataGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="shadow-sys" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <marker id="arr-sys" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#64748b" />
+    </marker>
+    <marker id="arr-sys-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arr-sys-sky" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <text x="50" y="46" fill="#f8fafc" font-size="22" font-weight="700" letter-spacing="-0.5">GitBot — Production System Architecture &amp; Deployment Topology</text>
+  <text x="50" y="70" fill="#94a3b8" font-size="12">Multi-Cloud Edge Deployment, Isolated Ingress, Containerized Backend, Vector Engine &amp; Zero-Persistence Cache</text>
+  <rect x="1030" y="32" width="120" height="26" rx="6" fill="#1e293b" stroke="#334155"/>
+  <text x="1090" y="49" fill="#10b981" font-size="11" font-weight="600" text-anchor="middle">System Design</text>
+
+  <!-- Top Level Client & Edge Tier -->
+  <g transform="translate(50, 100)">
+    <rect width="1100" height="135" rx="12" fill="url(#sysEdgeGrad)" stroke="#0284c7" stroke-width="1.2" filter="url(#shadow-sys)"/>
+    <text x="25" y="30" fill="#38bdf8" font-size="11" font-weight="700">TIER 1: CLIENT ACCESS &amp; EDGE NETWORKING</text>
+
+    <!-- Client Node -->
+    <rect x="25" y="45" width="220" height="72" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="40" y="70" fill="#f8fafc" font-size="12" font-weight="600">Developer Client</text>
+    <text x="40" y="88" fill="#94a3b8" font-size="10">Web Browser / Mobile Device</text>
+    <text x="40" y="103" fill="#38bdf8" font-size="10">Sends Cookies + XSRF-TOKEN</text>
+
+    <!-- Edge CDN / Vercel -->
+    <rect x="290" y="45" width="260" height="72" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="305" y="68" fill="#f8fafc" font-size="12" font-weight="600">Frontend Hosting (Vercel Edge)</text>
+    <text x="305" y="86" fill="#10b981" font-size="10">Domain: https://gitbot.in</text>
+    <text x="305" y="101" fill="#94a3b8" font-size="10">Next.js 16.3 App Router • Global CDN</text>
+
+    <!-- DNS & Ingress Routing -->
+    <rect x="590" y="45" width="240" height="72" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="605" y="68" fill="#f8fafc" font-size="12" font-weight="600">DNS &amp; TLS Ingress</text>
+    <text x="605" y="86" fill="#c084fc" font-size="10">Cloudflare / Let's Encrypt TLS 1.3</text>
+    <text x="605" y="101" fill="#94a3b8" font-size="10">Routes https://api.gitbot.in (Port 443)</text>
+
+    <!-- Security Gateway -->
+    <rect x="870" y="45" width="205" height="72" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="885" y="68" fill="#f8fafc" font-size="12" font-weight="600">Cross-Origin Security</text>
+    <text x="885" y="86" fill="#f59e0b" font-size="10">CORS: https://gitbot.in Only</text>
+    <text x="885" y="101" fill="#10b981" font-size="10">SameSite=Lax • HttpOnly Cookies</text>
+
+    <path d="M 245 81 L 290 81" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arr-sys-sky)"/>
+    <path d="M 550 81 L 590 81" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arr-sys-sky)"/>
+    <path d="M 830 81 L 870 81" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arr-sys-sky)"/>
+  </g>
+
+  <!-- Middle Level Application Tier -->
+  <g transform="translate(50, 255)">
+    <rect width="1100" height="260" rx="12" fill="url(#sysBackendGrad)" stroke="#10b981" stroke-width="1.2" filter="url(#shadow-sys)"/>
+    <text x="25" y="30" fill="#34d399" font-size="11" font-weight="700">TIER 2: CONTAINERIZED APPLICATION SERVICE (Render Web Service / AWS EC2 Host)</text>
+
+    <!-- Nginx Reverse Proxy Container -->
+    <rect x="25" y="45" width="230" height="195" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="40" y="68" fill="#c084fc" font-size="12" font-weight="600">Nginx Reverse Proxy</text>
+    <text x="40" y="86" fill="#94a3b8" font-size="10">• TLS Termination (Certbot SSL)</text>
+    <text x="40" y="103" fill="#10b981" font-size="10">• proxy_buffering off (SSE Stream)</text>
+    <text x="40" y="120" fill="#94a3b8" font-size="10">• proxy_read_timeout 300s</text>
+    <text x="40" y="137" fill="#94a3b8" font-size="10">• Header injection: X-Forwarded-Proto</text>
+    <text x="40" y="154" fill="#94a3b8" font-size="10">• Host &amp; X-Real-IP passthrough</text>
+    <text x="40" y="180" fill="#38bdf8" font-size="10" font-weight="600">Port 80/443 Public</text>
+    <text x="40" y="196" fill="#ef4444" font-size="10">All internal ports isolated</text>
+
+    <!-- Spring Boot Application Container -->
+    <rect x="280" y="45" width="490" height="195" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="295" y="68" fill="#34d399" font-size="13" font-weight="600">Spring Boot 4.1.1 Application Service (Java 25 Temurin)</text>
+
+    <!-- Memory optimization badges -->
+    <rect x="295" y="80" width="460" height="42" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="305" y="97" fill="#fbbf24" font-size="10" font-weight="600">Memory-Tuned Sub-512MB Ergonomics:</text>
+    <text x="305" y="112" fill="#94a3b8" font-size="9">• SerialGC (-XX:+UseSerialGC) • Max Heap 200MB • MALLOC_ARENA_MAX=2 • Max 20 Tomcat Threads</text>
+
+    <!-- Internal Pipelines -->
+    <rect x="295" y="132" width="220" height="95" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="305" y="150" fill="#f8fafc" font-size="11" font-weight="600">Asynchronous Ingestion</text>
+    <text x="305" y="167" fill="#94a3b8" font-size="9">• @Async("indexingExecutor")</text>
+    <text x="305" y="181" fill="#94a3b8" font-size="9">• 1 Core / 2 Max Threads / Queue: 25</text>
+    <text x="305" y="195" fill="#94a3b8" font-size="9">• 60-line Chunks / 10 Overlap</text>
+    <text x="305" y="209" fill="#10b981" font-size="9">• VECTOR_BATCH_SIZE = 16</text>
+
+    <rect x="535" y="132" width="220" height="95" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="545" y="150" fill="#f8fafc" font-size="11" font-weight="600">RAG &amp; SSE Controller</text>
+    <text x="545" y="167" fill="#94a3b8" font-size="9">• Repository Metadata Isolation</text>
+    <text x="545" y="181" fill="#94a3b8" font-size="9">• Top-5 Cosine Similarity Search</text>
+    <text x="545" y="195" fill="#94a3b8" font-size="9">• Adjacent Chunk Expansion (±1)</text>
+    <text x="545" y="209" fill="#38bdf8" font-size="9">• Non-blocking SseEmitter output</text>
+
+    <!-- Security & CSRF Component -->
+    <rect x="790" y="45" width="285" height="195" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="805" y="68" fill="#38bdf8" font-size="12" font-weight="600">Security &amp; Encryption Subsystem</text>
+    <text x="805" y="88" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">SpaCsrfTokenRequestHandler</tspan>:</text>
+    <text x="815" y="103" fill="#94a3b8" font-size="9">Resolves XOR-masked tokens from SPA</text>
+    <text x="815" y="117" fill="#94a3b8" font-size="9">while preserving raw token dev fallback</text>
+    <text x="805" y="135" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">AES-256 Token Encryption</tspan>:</text>
+    <text x="815" y="150" fill="#94a3b8" font-size="9">Encrypts GitHub PATs before DB write</text>
+    <text x="805" y="168" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff" font-weight="600">Session Management</tspan>:</text>
+    <text x="815" y="183" fill="#94a3b8" font-size="9">7-day server session via GITBOT_SESSION</text>
+    <text x="815" y="197" fill="#10b981" font-size="9">Strict repo ownership validation</text>
+  </g>
+
+  <!-- Bottom Level Data & External Tier -->
+  <g transform="translate(50, 535)">
+    <rect width="1100" height="235" rx="12" fill="url(#sysDataGrad)" stroke="#f59e0b" stroke-width="1.2" filter="url(#shadow-sys)"/>
+    <text x="25" y="30" fill="#fbbf24" font-size="11" font-weight="700">TIER 3: PERSISTENT STORAGE, IN-MEMORY CACHE &amp; EXTERNAL CLOUD APIS</text>
+
+    <!-- PostgreSQL Container -->
+    <rect x="25" y="45" width="310" height="170" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="40" y="68" fill="#f59e0b" font-size="12" font-weight="600">Neon / PostgreSQL 16 + pgvector</text>
+    <text x="40" y="88" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff">Relational</tspan>: users, git_repositories,</text>
+    <text x="40" y="103" fill="#94a3b8" font-size="10">  chat_sessions, chat_messages, reports</text>
+    <text x="40" y="121" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff">Vector Store</tspan>: vector_store table</text>
+    <text x="40" y="136" fill="#94a3b8" font-size="10">  1536 float embedding dimensions</text>
+    <text x="40" y="151" fill="#10b981" font-size="10">• HNSW Index: COSINE_DISTANCE (&lt;=&gt;)</text>
+    <text x="40" y="169" fill="#94a3b8" font-size="10">• Flat UUID references (0 N+1 overhead)</text>
+    <text x="40" y="185" fill="#38bdf8" font-size="10">• DB-level ON DELETE CASCADE</text>
+
+    <!-- Redis / Valkey -->
+    <rect x="360" y="45" width="260" height="170" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="375" y="68" fill="#f59e0b" font-size="12" font-weight="600">Valkey 8 / Redis (Volatile State)</text>
+    <text x="375" y="88" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff">Demo Quota</tspan>: 5 msgs per client IP</text>
+    <text x="375" y="103" fill="#94a3b8" font-size="10">  2-hour TTL sliding window</text>
+    <text x="375" y="121" fill="#94a3b8" font-size="10">• <tspan fill="#ffffff">IP Rate Limiter</tspan>: 20 requests/minute</text>
+    <text x="375" y="136" fill="#94a3b8" font-size="10">  Protects against LLM DoS exhaustion</text>
+    <text x="375" y="154" fill="#10b981" font-size="10">• <tspan fill="#ffffff">0 Database Persistence</tspan>:</text>
+    <text x="375" y="169" fill="#10b981" font-size="10">  Anonymous chat leaves 0 DB trace</text>
+    <text x="375" y="185" fill="#94a3b8" font-size="10">• Port 6379 (Internal Docker Network)</text>
+
+    <!-- GitHub REST API -->
+    <rect x="645" y="45" width="210" height="170" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="660" y="68" fill="#ec4899" font-size="12" font-weight="600">GitHub REST API v3</text>
+    <text x="660" y="88" fill="#94a3b8" font-size="10">• OAuth2 Token Grant</text>
+    <text x="660" y="103" fill="#94a3b8" font-size="10">• User Profile &amp; Avatar</text>
+    <text x="660" y="121" fill="#94a3b8" font-size="10">• Recursive Tree Traversal</text>
+    <text x="660" y="136" fill="#94a3b8" font-size="10">• Raw Blob Source Fetch</text>
+    <text x="660" y="154" fill="#94a3b8" font-size="10">• Latest Commit SHA check</text>
+    <text x="660" y="169" fill="#10b981" font-size="10">• 50ms Throttler Protection</text>
+
+    <!-- OpenAI API -->
+    <rect x="880" y="45" width="205" height="170" rx="8" fill="#0f172a" stroke="#1e293b"/>
+    <text x="895" y="68" fill="#ec4899" font-size="12" font-weight="600">OpenAI Cloud API</text>
+    <text x="895" y="88" fill="#38bdf8" font-size="10">• text-embedding-3-small</text>
+    <text x="895" y="103" fill="#94a3b8" font-size="10">  1536 float embeddings</text>
+    <text x="895" y="118" fill="#94a3b8" font-size="10">  Batch size: 16 chunks</text>
+    <text x="895" y="136" fill="#38bdf8" font-size="10">• gpt-4o-mini</text>
+    <text x="895" y="151" fill="#94a3b8" font-size="10">  Streaming Chat Completion</text>
+    <text x="895" y="166" fill="#94a3b8" font-size="10">  128k context window</text>
+    <text x="895" y="181" fill="#10b981" font-size="10">  Reactive Flux stream</text>
+  </g>
+</svg>

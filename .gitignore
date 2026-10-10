@@ -11,6 +11,7 @@ target/
 entire-codebase.xml
 codebase_inspection.md
 PROGRESS.md
+docs/INTERVIEW_GUIDE.md
 
 ### STS ###
 .apt_generated

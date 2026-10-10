@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820" width="100%" height="100%" style="background:#090d16; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow-rag" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#0284c7" />
+    </marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#a855f7" />
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <text x="40" y="44" fill="#f8fafc" font-size="22" font-weight="700" letter-spacing="-0.5">GitBot — Complete RAG &amp; Vector Retrieval Flow</text>
+  <text x="40" y="68" fill="#94a3b8" font-size="12">Dual-Track Pipeline: Asynchronous Ingestion &amp; Repository-Isolated Augmented Generation</text>
+  <rect x="1030" y="30" width="130" height="24" rx="6" fill="#1e293b" stroke="#334155"/>
+  <text x="1095" y="46" fill="#38bdf8" font-size="11" font-weight="600" text-anchor="middle">pgvector + HNSW</text>
+
+  <!-- ==================== TRACK A: INGESTION PIPELINE ==================== -->
+  <g transform="translate(40, 90)">
+    <rect width="1120" height="320" rx="12" fill="#0f172a" stroke="#0284c7" stroke-width="1.2" filter="url(#shadow-rag)"/>
+    <rect x="16" y="12" width="280" height="26" rx="6" fill="#0284c7" fill-opacity="0.2"/>
+    <text x="26" y="29" fill="#38bdf8" font-size="11" font-weight="700">TRACK A: ASYNCHRONOUS INGESTION &amp; INDEXING</text>
+
+    <!-- Step A1: Trigger -->
+    <rect x="20" y="55" width="150" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="40" cy="75" r="10" fill="#0284c7"/>
+    <text x="40" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">1</text>
+    <text x="56" y="78" fill="#f8fafc" font-size="12" font-weight="600">Trigger Index</text>
+    <text x="30" y="100" fill="#94a3b8" font-size="10">POST /api/repos/{id}/index</text>
+    <text x="30" y="115" fill="#38bdf8" font-size="10">Returns 202 Accepted</text>
+    <text x="30" y="130" fill="#94a3b8" font-size="10">State → INDEXING</text>
+    <text x="30" y="145" fill="#10b981" font-size="10">Async indexingExecutor</text>
+
+    <!-- Step A2: GitHub API Fetch -->
+    <rect x="195" y="55" width="165" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="215" cy="75" r="10" fill="#0284c7"/>
+    <text x="215" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">2</text>
+    <text x="231" y="78" fill="#f8fafc" font-size="12" font-weight="600">Git Tree Fetch</text>
+    <text x="205" y="100" fill="#94a3b8" font-size="10">GET /git/trees/:sha?rec=1</text>
+    <text x="205" y="115" fill="#94a3b8" font-size="10">Latest commit verification</text>
+    <text x="205" y="130" fill="#38bdf8" font-size="10">AES decrypts user PAT</text>
+    <text x="205" y="145" fill="#94a3b8" font-size="10">Rate-limited (50ms gap)</text>
+
+    <!-- Step A3: Code File Filter -->
+    <rect x="385" y="55" width="170" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="405" cy="75" r="10" fill="#0284c7"/>
+    <text x="405" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">3</text>
+    <text x="421" y="78" fill="#f8fafc" font-size="12" font-weight="600">File Filtering</text>
+    <text x="395" y="100" fill="#ef4444" font-size="10">Excludes: .git, node_modules,</text>
+    <text x="395" y="115" fill="#ef4444" font-size="10">binaries, images, lockfiles</text>
+    <text x="395" y="130" fill="#f59e0b" font-size="10">Size cap: maxFileBytes</text>
+    <text x="395" y="145" fill="#94a3b8" font-size="10">100 KB hard limit</text>
+
+    <!-- Step A4: Structural Chunker -->
+    <rect x="580" y="55" width="175" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="600" cy="75" r="10" fill="#0284c7"/>
+    <text x="600" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">4</text>
+    <text x="616" y="78" fill="#f8fafc" font-size="12" font-weight="600">Code Chunking</text>
+    <text x="590" y="100" fill="#38bdf8" font-size="10">Max chunk: 60 lines</text>
+    <text x="590" y="115" fill="#38bdf8" font-size="10">Cap: 1500 characters</text>
+    <text x="590" y="130" fill="#10b981" font-size="10">Overlap: 10 lines</text>
+    <text x="590" y="145" fill="#94a3b8" font-size="10">Injects: chunkIndex, path</text>
+
+    <!-- Step A5: Batch Embeddings -->
+    <rect x="780" y="55" width="160" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="800" cy="75" r="10" fill="#0284c7"/>
+    <text x="800" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">5</text>
+    <text x="816" y="78" fill="#f8fafc" font-size="12" font-weight="600">Batch Embed</text>
+    <text x="790" y="100" fill="#94a3b8" font-size="10">OpenAI API</text>
+    <text x="790" y="115" fill="#38bdf8" font-size="10">text-embedding-3-small</text>
+    <text x="790" y="130" fill="#f59e0b" font-size="10">Batch size: 16 chunks</text>
+    <text x="790" y="145" fill="#10b981" font-size="10">1536 float dimensions</text>
+
+    <!-- Step A6: Persist & Ready -->
+    <rect x="965" y="55" width="135" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="985" cy="75" r="10" fill="#0284c7"/>
+    <text x="985" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">6</text>
+    <text x="1001" y="78" fill="#f8fafc" font-size="12" font-weight="600">pgvector Store</text>
+    <text x="975" y="100" fill="#94a3b8" font-size="10">Insert vector_store</text>
+    <text x="975" y="115" fill="#38bdf8" font-size="10">HNSW Cosine index</text>
+    <text x="975" y="130" fill="#10b981" font-size="10">Atomic old clean</text>
+    <text x="975" y="145" fill="#10b981" font-size="10">Status → READY</text>
+
+    <!-- Ingestion Arrows -->
+    <path d="M 170 110 L 195 110" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)"/>
+    <path d="M 360 110 L 385 110" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)"/>
+    <path d="M 555 110 L 580 110" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)"/>
+    <path d="M 755 110 L 780 110" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)"/>
+    <path d="M 940 110 L 965 110" stroke="#0284c7" stroke-width="2" marker-end="url(#arr-blue)"/>
+
+    <!-- Ingestion Formula & Metadata Card -->
+    <rect x="20" y="185" width="1080" height="115" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="35" y="210" fill="#38bdf8" font-size="12" font-weight="700">INGESTION METADATA SCHEMA &amp; VECTOR FORMULA</text>
+    <text x="35" y="235" fill="#94a3b8" font-size="11">Stored JSON Metadata in PostgreSQL vector_store table:</text>
+    <rect x="35" y="245" width="560" height="42" rx="6" fill="#0f172a" stroke="#475569"/>
+    <text x="45" y="263" fill="#10b981" font-size="10" font-family="monospace">{"repoId": "UUID", "repoFullName": "org/repo", "filePath": "src/App.java",</text>
+    <text x="45" y="277" fill="#10b981" font-size="10" font-family="monospace"> "startLine": 1, "endLine": 60, "chunkIndex": 0, "runId": "UUID"}</text>
+
+    <text x="630" y="235" fill="#94a3b8" font-size="11">HNSW Vector Space Distance Operator (Cosine):</text>
+    <rect x="630" y="245" width="455" height="42" rx="6" fill="#0f172a" stroke="#475569"/>
+    <text x="645" y="263" fill="#fbbf24" font-size="11" font-family="monospace">distance(u, v) = 1 - ( (u · v) / ( ||u||₂ * ||v||₂ ) )</text>
+    <text x="645" y="277" fill="#94a3b8" font-size="10">Postgres operator: &lt;=&gt; (ORDER BY embedding &lt;=&gt; query_vector ASC)</text>
+  </g>
+
+  <!-- ==================== TRACK B: RETRIEVAL & GENERATION ==================== -->
+  <g transform="translate(40, 440)">
+    <rect width="1120" height="340" rx="12" fill="#0f172a" stroke="#10b981" stroke-width="1.2" filter="url(#shadow-rag)"/>
+    <rect x="16" y="12" width="280" height="26" rx="6" fill="#10b981" fill-opacity="0.2"/>
+    <text x="26" y="29" fill="#34d399" font-size="11" font-weight="700">TRACK B: RETRIEVAL &amp; CONTEXT-AUGMENTED CHAT</text>
+
+    <!-- Step B1: Prompt Input -->
+    <rect x="20" y="55" width="150" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="40" cy="75" r="10" fill="#10b981"/>
+    <text x="40" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">1</text>
+    <text x="56" y="78" fill="#f8fafc" font-size="12" font-weight="600">User Query</text>
+    <text x="30" y="100" fill="#94a3b8" font-size="10">POST /repos/{id}/chat</text>
+    <text x="30" y="115" fill="#38bdf8" font-size="10">Validate CSRF token</text>
+    <text x="30" y="130" fill="#38bdf8" font-size="10">Verify user session</text>
+    <text x="30" y="145" fill="#10b981" font-size="10">Verify repo is READY</text>
+
+    <!-- Step B2: Query Embedding -->
+    <rect x="195" y="55" width="165" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="215" cy="75" r="10" fill="#10b981"/>
+    <text x="215" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">2</text>
+    <text x="231" y="78" fill="#f8fafc" font-size="12" font-weight="600">Query Vector</text>
+    <text x="205" y="100" fill="#94a3b8" font-size="10">OpenAI API</text>
+    <text x="205" y="115" fill="#38bdf8" font-size="10">text-embedding-3-small</text>
+    <text x="205" y="130" fill="#94a3b8" font-size="10">User prompt text →</text>
+    <text x="205" y="145" fill="#10b981" font-size="10">1536 float embedding</text>
+
+    <!-- Step B3: Cosine Similarity -->
+    <rect x="385" y="55" width="170" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="405" cy="75" r="10" fill="#10b981"/>
+    <text x="405" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">3</text>
+    <text x="421" y="78" fill="#f8fafc" font-size="12" font-weight="600">pgvector Search</text>
+    <text x="395" y="100" fill="#38bdf8" font-size="10">Filter: repoId == :id</text>
+    <text x="395" y="115" fill="#10b981" font-size="10">HNSW Cosine similarity</text>
+    <text x="395" y="130" fill="#fbbf24" font-size="10">Top-k: 5 chunks</text>
+    <text x="395" y="145" fill="#94a3b8" font-size="10">0 Cross-repo leakage</text>
+
+    <!-- Step B4: Context Assembly -->
+    <rect x="580" y="55" width="175" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="600" cy="75" r="10" fill="#10b981"/>
+    <text x="600" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">4</text>
+    <text x="616" y="78" fill="#f8fafc" font-size="12" font-weight="600">Context Assembly</text>
+    <text x="590" y="100" fill="#38bdf8" font-size="10">Neighbor: chunkIndex ± 1</text>
+    <text x="590" y="115" fill="#f59e0b" font-size="10">Lexical ILIKE fallback</text>
+    <text x="590" y="130" fill="#10b981" font-size="10">Cap: 12,000 characters</text>
+    <text x="590" y="145" fill="#94a3b8" font-size="10">Build XML Grounding</text>
+
+    <!-- Step B5: LLM Generation -->
+    <rect x="780" y="55" width="160" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="800" cy="75" r="10" fill="#10b981"/>
+    <text x="800" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">5</text>
+    <text x="816" y="78" fill="#f8fafc" font-size="12" font-weight="600">gpt-4o-mini</text>
+    <text x="790" y="100" fill="#94a3b8" font-size="10">OpenAI Chat Stream</text>
+    <text x="790" y="115" fill="#38bdf8" font-size="10">Project Reactor Flux</text>
+    <text x="790" y="130" fill="#10b981" font-size="10">Non-blocking tokens</text>
+    <text x="790" y="145" fill="#94a3b8" font-size="10">Extracts cited ranges</text>
+
+    <!-- Step B6: SSE Stream Out -->
+    <rect x="965" y="55" width="135" height="110" rx="8" fill="#1e293b" stroke="#334155"/>
+    <circle cx="985" cy="75" r="10" fill="#10b981"/>
+    <text x="985" y="79" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">6</text>
+    <text x="1001" y="78" fill="#f8fafc" font-size="12" font-weight="600">SSE Stream</text>
+    <text x="975" y="100" fill="#10b981" font-size="10">SseEmitter push</text>
+    <text x="975" y="115" fill="#38bdf8" font-size="10">Events: token,</text>
+    <text x="975" y="130" fill="#38bdf8" font-size="10">citations, done</text>
+    <text x="975" y="145" fill="#94a3b8" font-size="10">Streamdown render</text>
+
+    <!-- Retrieval Arrows -->
+    <path d="M 170 110 L 195 110" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+    <path d="M 360 110 L 385 110" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+    <path d="M 555 110 L 580 110" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+    <path d="M 755 110 L 780 110" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+    <path d="M 940 110 L 965 110" stroke="#10b981" stroke-width="2" marker-end="url(#arr-green)"/>
+
+    <!-- Grounding Prompt Example Box -->
+    <rect x="20" y="185" width="1080" height="135" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="35" y="210" fill="#10b981" font-size="12" font-weight="700">STRUCTURED GROUNDING PROMPT TEMPLATE &amp; CITATION CONTRACT</text>
+    
+    <rect x="35" y="222" width="700" height="85" rx="6" fill="#0f172a" stroke="#475569"/>
+    <text x="45" y="240" fill="#c084fc" font-size="10" font-family="monospace">&lt;system_instructions&gt; Answer using ONLY the provided repository code sources. &lt;/system_instructions&gt;</text>
+    <text x="45" y="258" fill="#38bdf8" font-size="10" font-family="monospace">&lt;source path="src/SecurityConfig.java" start_line="14" end_line="45"&gt;</text>
+    <text x="45" y="274" fill="#94a3b8" font-size="10" font-family="monospace">  @Bean public SecurityFilterChain filterChain(HttpSecurity http) { ... }</text>
+    <text x="45" y="290" fill="#38bdf8" font-size="10" font-family="monospace">&lt;/source&gt;</text>
+
+    <rect x="750" y="222" width="335" height="85" rx="6" fill="#0f172a" stroke="#475569"/>
+    <text x="760" y="240" fill="#fbbf24" font-size="10" font-weight="700">Client-Side Citation Parsing:</text>
+    <text x="760" y="258" fill="#94a3b8" font-size="10">• Path: "src/SecurityConfig.java"</text>
+    <text x="760" y="272" fill="#94a3b8" font-size="10">• Line Range: Lines 14–45</text>
+    <text x="760" y="286" fill="#10b981" font-size="10">• Direct link to GitHub Blob viewer</text>
+    <text x="760" y="300" fill="#94a3b8" font-size="10">• Prevents LLM code hallucination</text>
+  </g>
+</svg>

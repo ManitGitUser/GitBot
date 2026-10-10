@@ -1,6 +1,24 @@
 # GitBot — AI-Powered Codebase Assistant
 
-GitBot is a full-stack, retrieval-augmented codebase assistant built with Spring Boot, Java 25, Next.js, and PostgreSQL with pgvector. It connects to GitHub via OAuth2, synchronizes and indexes repositories into vector embeddings, and provides repository-isolated, citation-backed AI conversations streamed in real time over Server-Sent Events (SSE).
+GitBot is a full-stack, retrieval-augmented codebase assistant built with Spring Boot 4.1.1, Java 25, Next.js 16, and PostgreSQL 16 with pgvector. It connects to GitHub via OAuth2, synchronizes and indexes repositories into vector embeddings, and provides repository-isolated, citation-backed AI conversations streamed in real time over Server-Sent Events (SSE).
+
+<p align="center">
+  <sub>
+    🌐 <strong>Live App:</strong> <a href="https://gitbot.in">gitbot.in</a> &nbsp;•&nbsp;
+    🎥 <strong>Video Walkthrough:</strong> <a href="#demo">Watch Demonstration</a> &nbsp;•&nbsp;
+    📦 <strong>Repository:</strong> <a href="https://github.com/ManitGitUser/GitBot">ManitGitUser/GitBot</a> &nbsp;•&nbsp;
+    📄 <strong>License:</strong> <a href="LICENSE.md">MIT</a>
+  </sub>
+</p>
+
+<a id="demo"></a>
+<div align="center">
+  <sub>🎥 <strong>Product Demonstration Walkthrough</strong> (Full features &amp; live codebase conversation)</sub>
+  <br/>
+  <video src="docs/gitbot-demonstration.mp4" controls="controls" width="100%" style="max-width: 100%; border-radius: 8px; margin-top: 8px;">
+    Your browser does not support the video tag.
+  </video>
+</div>
 
 ---
 
@@ -30,9 +48,9 @@ Software engineers spend a substantial portion of their time reading, tracing, a
 
 ---
 
-## Architecture
+## System Architecture
 
-![GitBot System Architecture](docs/system-design.png)
+![GitBot System Architecture](docs/gitbot-system-architecture.svg)
 
 GitBot is designed with a clean separation of concerns between user-facing presentation, backend domain orchestration, persistent storage, and external AI/VCS platforms:
 
@@ -41,20 +59,68 @@ GitBot is designed with a clean separation of concerns between user-facing prese
 2. **Backend Processing**: The Spring Boot backend on `api.gitbot.in` authenticates requests via HTTP-only session cookies and CSRF tokens, orchestrating business logic across dedicated services.
 3. **External Services**:
    * **GitHub REST API**: Discovers user repositories and fetches raw source tree files.
-   * **Neon PostgreSQL**: Stores relational entities (`users`, `git_repositories`, `chat_sessions`, `chat_messages`) and vector embeddings in `vector_store`.
-   * **Render Key Value (Redis)**: Manages demo IP rate limits and temporary message quotas.
+   * **PostgreSQL with pgvector**: Stores relational entities (`users`, `git_repositories`, `chat_sessions`, `chat_messages`) and vector embeddings in `vector_store`.
+   * **Valkey / Redis**: Manages demo IP rate limits and temporary message quotas.
    * **OpenAI API**: Computes vector embeddings (`text-embedding-3-small`) and streams chat completions (`gpt-4o-mini`).
 4. **Streaming Response**: Generated tokens and code citations stream back to the Next.js client via Server-Sent Events (SSE).
 
-### RAG Pipeline Flow
-* **Indexing Track**:
-  $$\text{GitHub Repository} \xrightarrow{\text{Tree API}} \text{Source Files} \xrightarrow{\text{Filter \& Chunker}} \text{Code Chunks} \xrightarrow{\text{Batch Embeddings}} \text{pgvector Storage}$$
-* **Query Track**:
-  $$\text{User Query} \xrightarrow{\text{Embed}} \text{Query Vector} \xrightarrow{\text{Repository Filter}} \text{Cosine Search} \xrightarrow{\text{Context Assembly}} \text{LLM} \xrightarrow{\text{SSE}} \text{Browser}$$
+### High-Level Design (HLD)
+
+![GitBot High-Level Design](docs/gitbot-hld.svg)
 
 ---
 
-## Backend Architecture
+## RAG & Vector Retrieval Pipeline
+
+![GitBot RAG Flow](docs/gitbot-rag-flow.svg)
+
+### Ingestion & Indexing Pipeline
+$$\text{GitHub Repository} \xrightarrow{\text{Tree API}} \text{Source Files} \xrightarrow{\text{Filter and Chunker}} \text{Code Chunks} \xrightarrow{\text{Batch Embeddings}} \text{pgvector Storage}$$
+
+1. **Discovery & Validation**: Verifies repository ownership and resolves the latest commit SHA via GitHub API.
+2. **File Filtering (`CodeFileFilter`)**: Recursively inspects Git tree items, excluding binaries, images, package lockfiles, minified bundles, vendor folders (`node_modules`, `target`, `.git`), and files exceeding `100 KB` (`maxFileBytes: 102400`).
+3. **Code Chunking (`CodeChunker`)**: Partitions source files into structural text segments using a sliding window:
+   * **Max Chunk Size**: 60 lines (capped at 1,500 characters).
+   * **Overlap**: 10 lines, preserving structural continuity between adjacent segments.
+   * **Metadata Enrichment**: Injects `repoId`, `repoFullName`, `filePath`, `startLine`, `endLine`, `chunkIndex`, and ingestion `runId` into every document.
+4. **Batched Embeddings**: Chunks are grouped into batches of 16 (`VECTOR_BATCH_SIZE = 16`) and dispatched to OpenAI `text-embedding-3-small`, transforming text into 1536-dimensional float vectors.
+5. **Persistence**: Writes document text, embeddings, and JSON metadata into the `vector_store` table.
+6. **Atomic Clean-up**: Old vectors from previous runs are removed only after the new index run completes successfully.
+
+### Retrieval & Context Assembly (`CodeContextRetriever`)
+$$\text{User Query} \xrightarrow{\text{Embed}} \text{Query Vector} \xrightarrow{\text{Repository Filter}} \text{Cosine Search} \xrightarrow{\text{Context Assembly}} \text{LLM} \xrightarrow{\text{SSE}} \text{Browser}$$
+
+1. **Query Embedding**: The incoming user query is embedded into a 1536-dimensional vector using `text-embedding-3-small`.
+2. **Repository-Scoped Search**: Executes similarity search against `vector_store` with an exact metadata filter: `repoId == :repositoryId`.
+3. **Neighboring Chunks**: For top-ranking matches, the retriever queries adjacent chunks (`chunkIndex ± 1`) via lightweight SQL, supplying broader file context without generating additional vector embeddings.
+4. **Lexical Fallback**: If vector search yields 0 matches for a query containing identifier tokens (e.g., method names), the system executes an exact SQL `ILIKE` fallback scoped to the repository.
+5. **Budget & Ranking**: Constrains context to a maximum of 5 top chunks (`top-k: 5`) and a total ceiling of 12,000 characters (`max-context-chars: 12000`).
+6. **Structured Prompt Construction**: Chunks are assembled into structured XML tags (`<source path="..." lines="...">...</source>`) within the system prompt, providing ground-truth references for citations.
+
+---
+
+## Real-Time Chat & Streaming Lifecycle
+
+![GitBot Chat Flow](docs/gitbot-chat-flow.svg)
+
+Chat responses are streamed incrementally using HTTP Server-Sent Events (SSE):
+
+* **Backend Dispatch**: `ChatController` and `DemoController` produce `text/event-stream` via Spring's `SseEmitter`.
+* **Reactive Model Bridge**: Subscribes to OpenAI's streaming API via Project Reactor `Flux<ChatResponse>`, pushing SSE events as tokens arrive from `gpt-4o-mini`.
+* **Structured Event Types**:
+  * `assistant_message`: Emits placeholder assistant metadata.
+  * `token`: Emits individual generated text tokens.
+  * `citations`: Emits source file references and line numbers.
+  * `done`: Signals clean stream completion and flushes persistence.
+  * `error`: Transmits structured error payloads on generation failures.
+* **Frontend Rendering**: The Next.js client reads the stream via the Fetch API `ReadableStream` reader, passing chunks into `streamdown` to preserve markdown syntax, code fences, and whitespace dynamically.
+* **Scroll Lock Protection**: When a developer scrolls up > 15px to read earlier code, auto-scroll unlocks so the user is never dragged down by streaming tokens.
+
+---
+
+## Low-Level Design & Component Architecture
+
+![GitBot Low-Level Design](docs/gitbot-lld.svg)
 
 The backend is developed with **Spring Boot 4.1.1** running on **Java 25**, structured into clean layered boundaries:
 
@@ -83,39 +149,6 @@ com.example.gitbot
 
 ---
 
-## RAG / Code Search Pipeline
-
-### 1. Ingestion & Indexing
-1. **Discovery & Validation**: Verifies repository ownership and resolves the latest commit SHA via GitHub API.
-2. **File Filtering (`CodeFileFilter`)**: Recursively inspects Git tree items, excluding binaries, images, package lockfiles, minified bundles, vendor folders (`node_modules`, `target`, `.git`), and files exceeding `100 KB` (`maxFileBytes: 102400`).
-3. **Code Chunking (`CodeChunker`)**: Partitions source files into structural text segments using a sliding window:
-   * **Max Chunk Size**: 60 lines (capped at 1,500 characters).
-   * **Overlap**: 10 lines, preserving structural continuity between adjacent segments.
-   * **Metadata Enrichment**: Injects `repoId`, `repoFullName`, `filePath`, `startLine`, `endLine`, `chunkIndex`, and ingestion `runId` into every document.
-4. **Batched Embeddings**: Chunks are grouped into batches of 32 (`VECTOR_BATCH_SIZE = 32`) and dispatched to OpenAI `text-embedding-3-small`, transforming text into 1536-dimensional float vectors.
-5. **Persistence**: Writes document text, embeddings, and JSON metadata into the Neon `vector_store` table.
-6. **Atomic Clean-up**: Old vectors from previous runs are removed only after the new index run completes successfully.
-
-### 2. Retrieval & Context Assembly (`CodeContextRetriever`)
-1. **Query Embedding**: The incoming user query is embedded into a 1536-dimensional vector using `text-embedding-3-small`.
-2. **Repository-Scoped Search**: Executes similarity search against `vector_store` with an exact metadata filter: `repoId == :repositoryId`.
-3. **Neighboring Chunks**: For top-ranking matches, the retriever queries adjacent chunks (`chunkIndex ± 1`) via lightweight SQL, supplying broader file context without generating additional vector embeddings.
-4. **Lexical Fallback**: If vector search yields 0 matches for a query containing identifier tokens (e.g., method names), the system executes an exact SQL `ILIKE` fallback scoped to the repository.
-5. **Budget & Ranking**: Constrains context to a maximum of 5 top chunks (`top-k: 5`) and a total ceiling of 12,000 characters (`max-context-chars: 12000`).
-6. **Structured Prompt Construction**: Chunks are assembled into structured XML tags (`<source path="..." lines="...">...</source>`) within the system prompt, providing ground-truth references for citations.
-
----
-
-## Authentication & Security
-
-* **OAuth2 Authorization Code Flow**: GitHub acts as the identity provider. The authorization code is exchanged server-side for an access token, protecting client credentials.
-* **Encrypted Token Storage**: GitHub access tokens are encrypted with AES-256 via Spring Security's `TextEncryptor` (`TOKEN_ENCRYPTOR_PASSWORD` and `TOKEN_ENCRYPTOR_SALT`) before being persisted in the database.
-* **Session Management**: Session state is preserved via a 7-day server-side session. Cookies enforce `HttpOnly`, `SameSite=Lax`, and `Secure` attributes in production.
-* **Cross-Origin CSRF Resolution**: During production deployment across `gitbot.in` (Vercel) and `api.gitbot.in` (Render), the SPA was unable to read the host-only cookie via `document.cookie`. The frontend was configured to obtain the token via `GET /api/auth/csrf`. To prevent Spring Security's XOR token mask from failing raw header comparisons, `SpaCsrfTokenRequestHandler` was updated to unmask XOR tokens while seamlessly falling back to raw tokens for local/same-origin development.
-* **Repository Authorization**: Every repository and chat operation strictly verifies ownership against `currentUser.getId()`. Attempts to access or index unowned repositories fail with `404 Not Found` or `403 Forbidden`.
-
----
-
 ## Data Model
 
 Relational schema managed in PostgreSQL 16 with relational foreign-key integrity constraints (`ON DELETE CASCADE` / `ON DELETE SET NULL`):
@@ -136,31 +169,15 @@ Relational schema managed in PostgreSQL 16 with relational foreign-key integrity
 Redis (or Valkey) is used as an in-memory, volatile data store:
 
 * **Demo Message Quota (`demo:quota:{sanitizedIp}`)**: Enforces a strict limit of **5 free messages per client IP** within a **2-hour window** (`TTL: 7200s`).
-* **Demo Rate Limiter (`demo:rate:{sanitizedIp}`)**: Enforces a rolling window of **10 requests per minute** (`TTL: 60s`) to prevent denial-of-service abuse against LLM endpoints.
+* **Demo Rate Limiter (`demo:rate:{sanitizedIp}`)**: Enforces a rolling window of **20 requests per minute** (`TTL: 60s`) to prevent denial-of-service abuse against LLM endpoints.
 * **Demo Session Verification (`demo:session:{sessionId}`)**: Stores the current message count for active anonymous sessions, cryptographically verified on the client via HMAC tokens (`X-Demo-Token`).
-* **Zero Database Impact**: Anonymous demo activity is tracked purely in Redis, guaranteeing zero database writes to Neon PostgreSQL from unauthenticated traffic.
+* **Zero Database Impact**: Anonymous demo activity is tracked purely in Redis, guaranteeing zero database writes to PostgreSQL from unauthenticated traffic.
 
 ---
 
-## Streaming Architecture
+## Frontend Architecture
 
-Chat responses are streamed incrementally using HTTP Server-Sent Events (SSE):
-
-* **Backend Dispatch**: `ChatController` and `DemoController` produce `text/event-stream` via Spring's `SseEmitter`.
-* **Reactive Model Bridge**: Subscribes to OpenAI's streaming API via Project Reactor `Flux<ChatResponse>`, pushing SSE events as tokens arrive from `gpt-4o-mini`.
-* **Structured Event Types**:
-  * `assistant_message`: Emits placeholder assistant metadata.
-  * `token`: Emits individual generated text tokens.
-  * `citations`: Emits source file references and line numbers.
-  * `done`: Signals clean stream completion and flushes persistence.
-  * `error`: Transmits structured error payloads on generation failures.
-* **Frontend Rendering**: The Next.js client reads the stream via the Fetch API `ReadableStream` reader, passing chunks into `streamdown` to preserve markdown syntax, code fences, and whitespace dynamically.
-
----
-
-## Frontend
-
-The frontend is an application built with **Next.js 16.3.2** and **React 19**:
+The frontend is built with **Next.js 16.3.2** and **React 19**:
 
 * **Rendering & Navigation**: Next.js App Router utilizing `proxy.ts` middleware for client-side route protection across `/dashboard` and `/chat`.
 * **Component System**: Styled using Tailwind CSS v4, `@base-ui/react`, and `shadcn/ui`.
@@ -172,16 +189,21 @@ The frontend is an application built with **Next.js 16.3.2** and **React 19**:
 
 ---
 
-## Deployment Architecture
+## Production Deployment & Memory Ergonomics
 
-GitBot runs on a production infrastructure configured for reliability and cost-efficiency:
+GitBot is engineered to operate reliably under strict container resource constraints:
 
 * **Frontend**: Hosted on **Vercel** with custom domain [`https://gitbot.in`](https://gitbot.in).
-* **Backend**: Hosted on **Render** (Docker containerized) with custom domain [`https://api.gitbot.in`](https://api.gitbot.in).
-  * **Memory Ergonomics**: Configured on a 512 MiB instance using Java 25 and G1GC:
-    `-XX:+UseG1GC -XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -Xss512k -XX:+ExitOnOutOfMemoryError`
-* **Relational & Vector Database**: **Neon Serverless PostgreSQL 16** with `pgvector` in the AWS Singapore region (`ap-southeast-1`).
-* **In-Memory Cache**: **Render Key Value** (Valkey 8 / Redis compatible).
+* **Backend**: Containerized Spring Boot 4.1.1 on **Render / AWS EC2** with custom domain [`https://api.gitbot.in`](https://api.gitbot.in).
+  * **Sub-512MB Memory Tuning**:
+    - **Garbage Collector**: SerialGC (`-XX:+UseSerialGC`) eliminating ~70 MB of G1GC native Remembered Set and Card Table overhead.
+    - **Native Glibc Memory**: `ENV MALLOC_ARENA_MAX=2` eliminating native malloc arena fragmentation.
+    - **Heap & Non-Heap Bounds**: `-Xms160m -Xmx200m -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=32m -Xss384k -XX:+ExitOnOutOfMemoryError`.
+    - **Thread & Pool Limits**: Tomcat worker threads capped at 20 (`server.tomcat.threads.max: 20`), HikariCP connection pool capped at 5 (`maximum-pool-size: 5`).
+    - **Vector Batch Size**: `VECTOR_BATCH_SIZE = 16` chunks to halve transient JSON payload allocations.
+    - **Worst-Case RSS**: ~393 MB, maintaining a safe buffer below 512 MB.
+* **Relational & Vector Database**: **PostgreSQL 16** with `pgvector` (HNSW cosine distance index).
+* **In-Memory Cache**: **Valkey 8 / Redis** for ephemeral rate limiting and quotas.
 * **AI Providers**: **OpenAI API** (`text-embedding-3-small` and `gpt-4o-mini`).
 
 ---
@@ -269,7 +291,7 @@ Open `http://localhost:3000` in your browser.
 
 ---
 
-## Testing
+## Testing & Quality Assurance
 
 The project is backed by a verified test suite covering unit logic, integration flows, controller web layers, and security policies:
 
@@ -277,30 +299,31 @@ The project is backed by a verified test suite covering unit logic, integration 
   * **175 tests passing** (0 failures, 0 errors, 0 skipped).
   * Covers OAuth token encryption, repository synchronization, code chunking, RAG context retrieval, streaming SSE emitters, demo rate limiting, and CSRF request handling.
 * **Frontend Test Suite (`npm run test`)**:
-  * **22 tests passing** (0 failures, 0 errors).
-  * Covers streaming markdown assembly, token parsing, account deletion dialogs, API error handling, and demo session storage boundaries.
+  * **25 tests passing** (0 failures, 0 errors).
+  * Covers streaming markdown assembly, token parsing, account deletion dialogs, API error handling, session expiration recovery, and demo storage contracts.
 * **Frontend Static Verification**:
   * **ESLint**: Passed with 0 errors and 0 warnings.
-  * **Production Build (`next build`)**: 11/11 routes compiled and optimized under Turbopack.
+  * **Production Build (`next build`)**: 11/11 routes compiled and optimized cleanly under Turbopack.
 
 ---
 
-## Engineering Decisions & Trade-offs
+## Engineering Decisions & Architecture Trade-offs
 
-* **Spring Boot & Java 25**: Java 25 provides modern language ergonomics and stable LTS runtime performance, while Spring Boot provides enterprise-grade abstractions for Spring Security, Spring AI, and connection pooling.
-* **PostgreSQL + pgvector vs. Standalone Vector DB**: Using PostgreSQL with `pgvector` keeps relational entities and vector embeddings in a single ACID-compliant database. This eliminates dual-write consistency issues, simplifies backups, and avoids the cost of external vector database services.
-* **Redis for Volatile State Only**: Redis is reserved for operations requiring sub-millisecond atomic increments (rate limiting and IP quotas). Authenticated session persistence is handled via server-side sessions, avoiding unnecessary Redis dependencies for core authentication.
-* **Server-Sent Events (SSE) vs. WebSockets**: LLM chat generation is fundamentally unidirectional (server $\rightarrow$ client stream). SSE operates over standard HTTP/2, traverses corporate proxies and firewalls without custom protocol handshakes, and provides native browser reconnection.
-* **Asynchronous Indexing via Thread Pool**: Ingesting a repository requires multi-step external network I/O. Decoupling ingestion onto an asynchronous executor prevents HTTP connection timeouts and keeps the web container responsive.
+* **Spring Boot 4.1.1 & Java 25**: Java 25 provides modern language ergonomics (records, pattern matching) and long-term stability. Spring Boot provides robust abstractions for Spring Security, OAuth2 authorization code flows, HikariCP connection pooling, and typed Spring AI integration.
+* **PostgreSQL 16 + pgvector vs. Standalone Vector DB**: Co-locating relational application entities (`users`, `repositories`, `sessions`, `messages`) and high-dimensional vector embeddings in PostgreSQL maintains full ACID consistency, eliminates dual-write drift, supports native SQL metadata filtering, and requires zero external vector SaaS cost.
+* **Redis for Volatile State Only**: Redis is reserved strictly for operations requiring atomic, sub-millisecond sliding windows (demo IP quotas and rate limiting). Authenticated user sessions are stored via HTTP-only server sessions, avoiding unnecessary Redis dependencies for core authentication.
+* **Server-Sent Events (SSE) vs. WebSockets**: LLM chat streaming is inherently unidirectional (server $\rightarrow$ client stream). SSE runs over standard HTTP/1.1 and HTTP/2, traverses corporate proxies and firewalls without custom protocol upgrade handshakes, and provides native browser reconnection.
+* **Asynchronous Indexing via Isolated Thread Pool**: Repository tree traversal, file filtering, chunking, and embedding require multi-step external network I/O. Decoupling ingestion onto an isolated `@Async("indexingExecutor")` thread pool prevents servlet thread starvation and returns immediate `202 Accepted` responses.
+* **Sub-512MB Container Ergonomics**: Tuning the container with SerialGC (`-XX:+UseSerialGC`), glibc arena limits (`MALLOC_ARENA_MAX=2`), a 200MB max heap, and constrained thread pools prevents cgroup Out-Of-Memory termination on low-memory cloud instances.
 
 ---
 
 ## Known Limitations & Planned Enhancements
 
-* **Synchronous N+1 Commit Verification during Sync**: The current `syncAllRepos` implementation makes sequential GitHub API calls to determine the latest commit SHA for each repository. In future iterations, this can be parallelized or converted to background jobs.
-* **Serverless Database Compute Cold Starts**: On free/serverless database tiers (Neon), compute instances auto-suspend after periods of inactivity, causing initial queries to experience 1.5s–3s of cold-start latency.
-* **Single-Node In-Memory Async Executor**: The indexing pipeline runs on a local Spring `@Async` executor thread pool. At enterprise scale, this should transition to a distributed message queue (RabbitMQ / Kafka) with dedicated worker nodes.
-* **Webhook-Driven Index Invalidation**: Currently, users trigger synchronization manually. Adding GitHub App webhooks will allow automatic re-indexing upon git push events.
+* **Synchronous N+1 Commit Verification during Sync**: The current `syncAllRepos` implementation checks remote commit SHAs sequentially via the GitHub API. Future iterations can parallelize requests or offload to background queues.
+* **Single-Node In-Memory Async Executor**: The indexing pipeline runs on a local Spring `@Async` executor thread pool. At enterprise scale, this transitions to a distributed message queue (RabbitMQ / Kafka) with dedicated worker nodes.
+* **Webhook-Driven Index Invalidation**: Currently, users trigger synchronization manually. Adding GitHub App webhooks will enable automated re-indexing upon git push events.
+* **Tree-Sitter Multi-Language AST Chunking**: The current line-based sliding window is deterministic and language-agnostic. Future iterations can integrate Tree-sitter parsers to split along grammatical function and class boundaries.
 
 ---
 
@@ -335,27 +358,16 @@ GitBot/
 ├── docker/
 │   └── postgres/                        # Postgres extensions and relational migrations
 ├── docs/
-│   ├── system-design.png                # System architecture diagram
-│   └── INTERVIEW_GUIDE.md               # Backend & System Design Interview Guide
+│   ├── gitbot-demonstration.mp4         # Demonstration video
+│   ├── gitbot-hld.svg                   # High-Level Design architecture
+│   ├── gitbot-lld.svg                   # Low-Level Design component architecture
+│   ├── gitbot-rag-flow.svg              # Complete RAG pipeline flow
+│   ├── gitbot-chat-flow.svg             # Real-time chat & SSE streaming lifecycle
+│   └── gitbot-system-architecture.svg   # System design & deployment topology
 ├── docker-compose.yaml                  # Local development infrastructure
 ├── Dockerfile                           # Production container image definition
 └── README.md                            # Project documentation
 ```
-
----
-
-## Interview Discussion Topics
-
-GitBot provides concrete implementation patterns for senior backend and system design discussions:
-
-* **OAuth2 & Distributed Session Security**: Handling stateful sessions, cookie flags, and cross-origin CSRF across separate domains.
-* **Retrieval-Augmented Generation (RAG)**: Chunking trade-offs, vector math, embedding latency, and preventing cross-tenant context contamination.
-* **PostgreSQL & pgvector**: Indexing high-dimensional vectors with HNSW, distance operators, and relational foreign keys.
-* **Reactive Real-Time Streaming**: Orchestrating Server-Sent Events from Project Reactor `Flux` streams over HTTP/2.
-* **Volatile State & Rate Limiting**: Designing atomic Redis quota tracking with sliding windows.
-* **Container Ergonomics**: Tuning JVM heap and non-heap boundaries (`MaxRAMPercentage`, Metaspace, CodeCache, thread stacks) under tight 512 MiB container cgroups.
-
-*For detailed preparation, review the [Backend & System Design Interview Guide](docs/INTERVIEW_GUIDE.md).*
 
 ---
 

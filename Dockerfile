@@ -33,7 +33,7 @@ USER gitbot:gitbot
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD curl -f -s http://localhost:8080/api/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
+  CMD sh -c "curl -f -s http://localhost:\${PORT:-8080}/api/health || exit 1"
 
-ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xms160m", "-Xmx200m", "-XX:MaxMetaspaceSize=96m", "-XX:ReservedCodeCacheSize=32m", "-Xss384k", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -XX:+UseSerialGC -Xms128m -Xmx200m -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -Xss384k -XX:+ExitOnOutOfMemoryError -jar /app/app.jar"]

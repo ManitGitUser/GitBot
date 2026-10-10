@@ -187,17 +187,16 @@ export default function DemoPage() {
                 viewport.scrollHeight - currentScrollTop - viewport.clientHeight;
 
             // If user's scroll position moved upwards (e.g. trackpad swipe, dragging scrollbar, key navigation)
-            if (currentScrollTop < prevScrollTop && distanceFromBottom > 15) {
+            if (currentScrollTop < prevScrollTop) {
                 isScrolledUpRef.current = true;
                 setIsScrolledUp(true);
                 lastUserUpScrollTimeRef.current = Date.now();
                 return;
             }
 
-            // User is at/near the bottom (within 20px)
-            if (distanceFromBottom <= 20) {
-                // Only clear if the user wasn't actively scrolling up in the last 400ms
-                if (Date.now() - lastUserUpScrollTimeRef.current > 400) {
+            // User is scrolling downwards and reached the bottom (within 20px)
+            if (currentScrollTop > prevScrollTop && distanceFromBottom <= 20) {
+                if (Date.now() - lastUserUpScrollTimeRef.current > 300) {
                     if (isScrolledUpRef.current) {
                         isScrolledUpRef.current = false;
                         setIsScrolledUp(false);
@@ -221,7 +220,7 @@ export default function DemoPage() {
                 // Downward wheel event: check if user reached bottom
                 const distanceFromBottom =
                     viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-                if (distanceFromBottom <= 20) {
+                if (distanceFromBottom <= 20 && Date.now() - lastUserUpScrollTimeRef.current > 300) {
                     isScrolledUpRef.current = false;
                     setIsScrolledUp(false);
                 }
@@ -429,16 +428,37 @@ export default function DemoPage() {
         } catch (err: unknown) {
             setStreaming(false);
             const msg = err instanceof Error ? err.message : "Failed to send message";
+            const status = err instanceof ApiError ? err.status : undefined;
             const isLimit =
+                status === 429 ||
                 msg.toLowerCase().includes("limit reached") ||
-                (err instanceof ApiError && err.status === 429);
+                msg.toLowerCase().includes("rate limit");
+
             if (isLimit) {
                 setMessageCount(MAX_DEMO_MESSAGES);
                 persistSession(messages, demoToken, MAX_DEMO_MESSAGES);
                 toast.add({
                     title: "Demo limit reached",
-                    description: msg,
+                    description: "You've used all 5 demo questions. Sign in with GitHub to connect your own repositories with unlimited access.",
                     type: "warning",
+                });
+            } else if (status === 409 || msg.toLowerCase().includes("not indexed")) {
+                toast.add({
+                    title: "Demo repository indexing",
+                    description: "The demo repository is currently being indexed. Please try again shortly or sign in with GitHub to explore your own repos.",
+                    type: "info",
+                });
+            } else if (status === 502 || status === 503) {
+                toast.add({
+                    title: "Server warming up",
+                    description: "The backend server is starting up or temporarily restarting. Please wait ~30 seconds and try again.",
+                    type: "warning",
+                });
+            } else if (status === 0 || msg.toLowerCase().includes("network") || msg.toLowerCase().includes("reach")) {
+                toast.add({
+                    title: "Connection error",
+                    description: "Unable to reach the GitBot demo server. Please check your internet connection.",
+                    type: "error",
                 });
             } else if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("not found")) {
                 sessionStorage.removeItem(STORAGE_KEYS.TOKEN);
@@ -459,7 +479,7 @@ export default function DemoPage() {
                 });
             } else {
                 toast.add({
-                    title: "Error",
+                    title: "Message failed",
                     description: msg,
                     type: "error",
                 });

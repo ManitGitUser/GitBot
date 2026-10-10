@@ -290,17 +290,16 @@ export function ChatMessages({
                 viewport.scrollHeight - currentScrollTop - viewport.clientHeight;
 
             // If user's scroll position moved upwards (e.g. trackpad swipe, dragging scrollbar, key navigation)
-            if (currentScrollTop < prevScrollTop && distanceFromBottom > 15) {
+            if (currentScrollTop < prevScrollTop) {
                 isScrolledUpRef.current = true;
                 setIsScrolledUp(true);
                 lastUserUpScrollTimeRef.current = Date.now();
                 return;
             }
 
-            // User is at/near the bottom (within 20px)
-            if (distanceFromBottom <= 20) {
-                // Only clear if the user wasn't actively scrolling up in the last 400ms
-                if (Date.now() - lastUserUpScrollTimeRef.current > 400) {
+            // User is scrolling downwards and reached the bottom (within 20px)
+            if (currentScrollTop > prevScrollTop && distanceFromBottom <= 20) {
+                if (Date.now() - lastUserUpScrollTimeRef.current > 300) {
                     if (isScrolledUpRef.current) {
                         isScrolledUpRef.current = false;
                         setIsScrolledUp(false);
@@ -324,7 +323,7 @@ export function ChatMessages({
                 // Downward wheel event: check if user reached bottom
                 const distanceFromBottom =
                     viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-                if (distanceFromBottom <= 20) {
+                if (distanceFromBottom <= 20 && Date.now() - lastUserUpScrollTimeRef.current > 300) {
                     isScrolledUpRef.current = false;
                     setIsScrolledUp(false);
                 }

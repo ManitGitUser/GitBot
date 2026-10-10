@@ -6,7 +6,7 @@ import { FolderGit2 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { RepoCard } from "@/components/dashboard/repo-card";
 import { RepoListItem } from "@/components/dashboard/repo-list-item";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
     Empty,
     EmptyDescription,
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRepos, useSyncAllRepos } from "@/hooks/use-repos";
-import type { IndexStatus } from "@/lib/api";
+import { ApiError, getGithubLoginUrl, type IndexStatus } from "@/lib/api";
 
 type FilterStatus = "ALL" | IndexStatus;
 
@@ -154,20 +154,37 @@ export function RepoDashboard() {
                     )
                 )}
 
-                {reposQuery.isError && (
-                    <Empty className="border border-dashed">
-                        <EmptyHeader>
-                            <EmptyMedia variant="icon">
-                                <FolderGit2 />
-                            </EmptyMedia>
-                            <EmptyTitle>Couldn’t load repositories</EmptyTitle>
-                            <EmptyDescription>
-                                {(reposQuery.error as Error).message}
-                            </EmptyDescription>
-                        </EmptyHeader>
-                        <Button onClick={() => void reposQuery.refetch()}>Try again</Button>
-                    </Empty>
-                )}
+                {reposQuery.isError && (() => {
+                    const err = reposQuery.error;
+                    const isAuth = err instanceof ApiError && err.status === 401;
+                    const isColdStart = err instanceof ApiError && (err.status === 502 || err.status === 503);
+                    return (
+                        <Empty className="border border-dashed">
+                            <EmptyHeader>
+                                <EmptyMedia variant="icon">
+                                    <FolderGit2 />
+                                </EmptyMedia>
+                                <EmptyTitle>
+                                    {isAuth
+                                        ? "Session expired"
+                                        : isColdStart
+                                            ? "Server starting up"
+                                            : "Couldn’t load repositories"}
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    {err instanceof Error ? err.message : "An error occurred while fetching repositories."}
+                                </EmptyDescription>
+                            </EmptyHeader>
+                            {isAuth ? (
+                                <a href={getGithubLoginUrl()} className={buttonVariants()}>
+                                    Sign in with GitHub
+                                </a>
+                            ) : (
+                                <Button onClick={() => void reposQuery.refetch()}>Try again</Button>
+                            )}
+                        </Empty>
+                    );
+                })()}
 
                 {reposQuery.isSuccess && repos.length === 0 && (
                     <Empty className="border border-dashed">

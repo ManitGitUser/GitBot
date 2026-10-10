@@ -1,4 +1,4 @@
-import { getApiBaseUrl, ApiError, type ChatMessage } from "@/lib/api";
+import { getApiBaseUrl, ApiError, parseError, type ChatMessage } from "@/lib/api";
 
 export type StreamDemoChatHandlers = {
     onDemoToken?: (token: string) => void;
@@ -23,12 +23,18 @@ export async function streamDemoChat(
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     const url = `${getApiBaseUrl()}/api/demo/chat`;
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-        signal: handlers.signal,
-    });
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+            signal: handlers.signal,
+        });
+    } catch (err: unknown) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        throw new ApiError(0, "Unable to connect to demo service. Please check your network connection.");
+    }
 
     const headerDemoToken = res.headers.get("X-Demo-Token");
     if (headerDemoToken) {
@@ -36,14 +42,7 @@ export async function streamDemoChat(
     }
 
     if (!res.ok) {
-        let message = res.statusText;
-        try {
-            const data = await res.json();
-            message = data.message ?? data.error ?? message;
-        } catch {
-            // ignore
-        }
-        throw new ApiError(res.status, message);
+        throw new ApiError(res.status, await parseError(res));
     }
 
     if (!res.body) {

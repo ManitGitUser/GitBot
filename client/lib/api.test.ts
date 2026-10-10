@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { apiFetch, ApiError } from "./api.ts";
+import { apiFetch, ApiError, parseError } from "./api.ts";
 
 // Mock global fetch for testing apiFetch behavior
 const originalFetch = globalThis.fetch;
@@ -301,6 +301,47 @@ test("demo storage contract - enforces sessionStorage and forbids localStorage",
     const currentCount = 5;
     const canSend = currentCount < MAX_DEMO_MESSAGES;
     assert.strictEqual(canSend, false);
+});
+
+test("parseError - translates HTML 502 Bad Gateway to friendly cold start message", async () => {
+    const htmlResponse = new Response("<html><body>502 Bad Gateway</body></html>", {
+        status: 502,
+        statusText: "Bad Gateway",
+        headers: { "Content-Type": "text/html" },
+    });
+    const message = await parseError(htmlResponse);
+    assert.ok(message.includes("warming up or temporarily restarting"));
+});
+
+test("parseError - translates 401 Unauthorized to friendly session expired message", async () => {
+    const response = new Response("", {
+        status: 401,
+        statusText: "Unauthorized",
+    });
+    const message = await parseError(response);
+    assert.ok(message.includes("session has expired"));
+});
+
+test("apiFetch - catches network failure and throws ApiError with status 0", async () => {
+    globalThis.fetch = async () => {
+        throw new TypeError("Failed to fetch");
+    };
+
+    try {
+        await assert.rejects(
+            async () => {
+                await apiFetch<void>("/api/test");
+            },
+            (err: unknown) => {
+                assert.ok(err instanceof ApiError);
+                assert.strictEqual(err.status, 0);
+                assert.ok(err.message.includes("Unable to reach the server"));
+                return true;
+            }
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });
 
 

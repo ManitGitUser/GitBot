@@ -48,7 +48,7 @@ import {
     useStreamChat,
 } from "@/hooks/use-chat";
 import { useIndexStatus, useRepository, useStartIndexing } from "@/hooks/use-repos";
-import type { ChatMessage, ChatSession, ReportReason } from "@/lib/api";
+import { ApiError, getGithubLoginUrl, type ChatMessage, type ChatSession, type ReportReason } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const REPORT_REASONS: { value: ReportReason; label: string; desc: string }[] = [
@@ -367,13 +367,29 @@ export function ChatView({ repoId }: { repoId: string }) {
     }
 
     if (repoQuery.isError || !repoQuery.data) {
+        const err = repoQuery.error;
+        const isAuth = err instanceof ApiError && err.status === 401;
+        const isColdStart = err instanceof ApiError && (err.status === 502 || err.status === 503);
         return (
-            <AppShell title="Repository unavailable">
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8">
+            <AppShell title={isAuth ? "Session expired" : isColdStart ? "Server warming up" : "Repository unavailable"}>
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center max-w-md mx-auto">
                     <p className="text-sm text-muted-foreground">
-                        {(repoQuery.error as Error)?.message ?? "Repository not found"}
+                        {err instanceof Error ? err.message : "Repository not found"}
                     </p>
-                    <Link href="/dashboard" className={buttonVariants()}>Back to dashboard</Link>
+                    <div className="flex items-center gap-2">
+                        {isAuth ? (
+                            <a href={getGithubLoginUrl()} className={buttonVariants({ size: "sm" })}>
+                                Sign in with GitHub
+                            </a>
+                        ) : (
+                            <Button size="sm" onClick={() => void repoQuery.refetch()}>
+                                Try again
+                            </Button>
+                        )}
+                        <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                            Back to dashboard
+                        </Link>
+                    </div>
                 </div>
             </AppShell>
         );

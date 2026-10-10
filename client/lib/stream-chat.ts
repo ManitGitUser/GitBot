@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getCsrfToken, ApiError, type ChatMessage } from "@/lib/api";
+import { getApiBaseUrl, getCsrfToken, ApiError, parseError, type ChatMessage } from "@/lib/api";
 
 export type StreamChatHandlers = {
     onUserMessage?: (message: ChatMessage) => void;
@@ -33,23 +33,22 @@ export async function streamChatMessage(
         ? JSON.stringify({ messageId: (payload as { retryMessageId: string }).retryMessageId })
         : JSON.stringify({ content: typeof payload === "string" ? payload : payload.content });
 
-    const res = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body,
-        signal: handlers.signal,
-    });
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers,
+            body,
+            signal: handlers.signal,
+        });
+    } catch (err: unknown) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        throw new ApiError(0, "Unable to connect to chat service. Please check your network connection.");
+    }
 
     if (!res.ok) {
-        let message = res.statusText;
-        try {
-            const data = await res.json();
-            message = data.message ?? data.error ?? message;
-        } catch {
-            // ignore
-        }
-        throw new ApiError(res.status, message);
+        throw new ApiError(res.status, await parseError(res));
     }
 
     if (!res.body) {

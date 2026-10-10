@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 
-import { api, type ChatMessage, type PagedMessagesResponse, type ReportReason } from "@/lib/api";
+import { api, ApiError, type ChatMessage, type PagedMessagesResponse, type ReportReason } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { streamChatMessage } from "@/lib/stream-chat";
 import { toast } from "@/components/ui/toast";
@@ -341,9 +341,10 @@ export function useStreamChat(sessionId: string | null) {
                         setStreaming(false);
                     },
                     onError: (err) => {
+                        const isAuth = (err instanceof ApiError && err.status === 401) || err.message.toLowerCase().includes("session has expired");
                         toast.add({
-                            title: "Stream error",
-                            description: err.message,
+                            title: isAuth ? "Session expired" : "Stream error",
+                            description: isAuth ? "Your session has expired. Please sign in again." : err.message,
                             type: "error",
                         });
                         void queryClient.invalidateQueries({
@@ -353,10 +354,16 @@ export function useStreamChat(sessionId: string | null) {
                 });
             } catch (err) {
                 setStreamText("");
-                if ((err as Error).name === "AbortError") return;
+                if ((err as Error)?.name === "AbortError") return;
+                const isAuth = (err instanceof ApiError && err.status === 401) || (err instanceof Error && err.message.toLowerCase().includes("session has expired"));
+                const isColdStart = err instanceof ApiError && (err.status === 502 || err.status === 503);
                 toast.add({
-                    title: "Message failed",
-                    description: err instanceof Error ? err.message : "Unknown error",
+                    title: isAuth ? "Session expired" : isColdStart ? "Server warming up" : "Message failed",
+                    description: isAuth
+                        ? "Your session has expired. Please sign in again."
+                        : isColdStart
+                            ? "The server is warming up or temporarily restarting. Please retry in a moment."
+                            : err instanceof Error ? err.message : "Unknown error",
                     type: "error",
                 });
                 void queryClient.invalidateQueries({
@@ -405,9 +412,10 @@ export function useStreamChat(sessionId: string | null) {
                         setRetryingMessageId(null);
                     },
                     onError: (err) => {
+                        const isAuth = (err instanceof ApiError && err.status === 401) || err.message.toLowerCase().includes("session has expired");
                         toast.add({
-                            title: "Retry error",
-                            description: err.message,
+                            title: isAuth ? "Session expired" : "Retry error",
+                            description: isAuth ? "Your session has expired. Please sign in again." : err.message,
                             type: "error",
                         });
                         void queryClient.invalidateQueries({
@@ -417,10 +425,16 @@ export function useStreamChat(sessionId: string | null) {
                 });
             } catch (err) {
                 setStreamText("");
-                if ((err as Error).name === "AbortError") return;
+                if ((err as Error)?.name === "AbortError") return;
+                const isAuth = (err instanceof ApiError && err.status === 401) || (err instanceof Error && err.message.toLowerCase().includes("session has expired"));
+                const isColdStart = err instanceof ApiError && (err.status === 502 || err.status === 503);
                 toast.add({
-                    title: "Retry failed",
-                    description: err instanceof Error ? err.message : "Unknown error",
+                    title: isAuth ? "Session expired" : isColdStart ? "Server warming up" : "Retry failed",
+                    description: isAuth
+                        ? "Your session has expired. Please sign in again."
+                        : isColdStart
+                            ? "The server is warming up or temporarily restarting. Please retry in a moment."
+                            : err instanceof Error ? err.message : "Unknown error",
                     type: "error",
                 });
                 void queryClient.invalidateQueries({

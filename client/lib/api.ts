@@ -187,17 +187,45 @@ export async function getCsrfToken(): Promise<string | null> {
     return getCookie("XSRF-TOKEN");
 }
 
-async function parseError(res: Response): Promise<string> {
+export async function parseError(res: Response): Promise<string> {
     try {
         const text = await res.text();
-        if (!text || !text.trim()) {
-            return res.statusText || "Request failed";
+        if (text && text.trim()) {
+            try {
+                const data = JSON.parse(text);
+                const msg = data.message ?? data.error;
+                if (msg && typeof msg === "string") return msg;
+            } catch {
+                // Not JSON (e.g. HTML 502/503 error page from reverse proxy or Cloudflare)
+            }
         }
-        const data = JSON.parse(text);
-        return data.message ?? data.error ?? res.statusText ?? "Request failed";
     } catch {
-        return res.statusText || "Request failed";
+        // ignore read error
     }
+
+    if (res.status === 502) {
+        return "Backend server is warming up or temporarily restarting. Please wait ~30 seconds and try again.";
+    }
+    if (res.status === 503) {
+        return "Service is temporarily unavailable. Please try again shortly.";
+    }
+    if (res.status === 504) {
+        return "Gateway timed out waiting for the server. The operation may still be processing.";
+    }
+    if (res.status === 401) {
+        return "Your session has expired. Please sign in again.";
+    }
+    if (res.status === 403) {
+        return "Request forbidden. Your CSRF token or session may have expired — please refresh the page.";
+    }
+    if (res.status === 409) {
+        return "A conflict occurred with this request. Please check status and try again.";
+    }
+    if (res.status === 429) {
+        return "Rate limit exceeded. Please wait a moment before trying again.";
+    }
+
+    return res.statusText || "Request failed";
 }
 
 export async function apiFetch<T>(
@@ -217,11 +245,17 @@ export async function apiFetch<T>(
         }
     }
 
-    const res = await fetch(`${getApiBaseUrl()}${path}`, {
-        ...init,
-        credentials: "include",
-        headers,
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${getApiBaseUrl()}${path}`, {
+            ...init,
+            credentials: "include",
+            headers,
+        });
+    } catch (err: unknown) {
+        if ((err as Error)?.name === "AbortError") throw err;
+        throw new ApiError(0, "Unable to reach the server. Please check your internet connection or backend status.");
+    }
 
     if (!res.ok) {
         throw new ApiError(res.status, await parseError(res));

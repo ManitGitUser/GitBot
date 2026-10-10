@@ -1,5 +1,3 @@
-# GitBot — AI-Powered Codebase Assistant
-
 GitBot is a full-stack, retrieval-augmented codebase assistant built with Spring Boot 4.1.1, Java 25, Next.js 16, and PostgreSQL 16 with pgvector. It connects to GitHub via OAuth2, synchronizes and indexes repositories into vector embeddings, and provides repository-isolated, citation-backed AI conversations streamed in real time over Server-Sent Events (SSE).
 
 <p align="center">

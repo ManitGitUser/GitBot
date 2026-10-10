@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ExternalLink, FolderGit2, Mail, PlayCircle } from "lucide-react";
+import { ExternalLink, FileText, FolderGit2, Mail, PlayCircle } from "lucide-react";
 import { GitBotIcon } from "@/components/icons/gitbot-icon";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,16 @@ export function AboutGitBotDialog({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50 text-xs">
+                        <a
+                            href={PROJECT_CONFIG.developer.resumeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                            <FileText className="size-3.5 text-primary" />
+                            <span>Resume</span>
+                            <ExternalLink className="size-2.5 opacity-60" />
+                        </a>
                         <a
                             href={PROJECT_CONFIG.developer.githubUrl}
                             target="_blank"

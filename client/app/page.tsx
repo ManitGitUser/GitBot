@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ExternalLink,
+  FileText,
   Info,
   Mail,
   PlayCircle,
@@ -189,6 +190,19 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-wrap items-center gap-2.5 pt-4 border-t border-border/60">
+            <a
+              href={PROJECT_CONFIG.developer.resumeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "gap-1.5 text-xs sm:text-sm font-medium px-3 py-1.5"
+              )}
+            >
+              <FileText className="size-3.5 text-primary" />
+              <span>Resume</span>
+              <ExternalLink className="size-2.5 opacity-60" />
+            </a>
             <a
               href={PROJECT_CONFIG.developer.githubUrl}
               target="_blank"

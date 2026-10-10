@@ -54,7 +54,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class IndexingService {
 
-    private static final int VECTOR_BATCH_SIZE = 32;
+    private static final int VECTOR_BATCH_SIZE = 16;
     private static final int PROGRESS_EVERY_N_FILES = 5;
 
     private final GitRepoRepository gitRepoRepository;

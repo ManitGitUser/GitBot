@@ -11,6 +11,8 @@ export const PROJECT_CONFIG = {
         githubUrl: "https://github.com/ManitGitUser",
         email: "manithumain@gmail.com",
         avatarUrl: "/owner-profile.png",
+        resumeUrl:
+            "https://drive.google.com/file/d/1C4qN0FLXWl80yXqdcnxa-vLvWZWQiDbW/view?usp=sharing",
     },
     // The GitBot repository URL can be updated here once the final URL is confirmed
     repositoryUrl: "https://github.com/ManitGitUser/GitBot",

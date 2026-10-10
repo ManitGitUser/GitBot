@@ -12,6 +12,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      idle-timeout: 300000
+      max-lifetime: 600000
 
   data:
     redis:
@@ -57,6 +62,12 @@ spring:
 server:
   port: ${PORT:8080}
   forward-headers-strategy: native
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 4
+    accept-count: 50
+    max-connections: 1000
   servlet:
     session:
       cookie:

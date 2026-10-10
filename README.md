@@ -5,8 +5,7 @@ GitBot is a full-stack, retrieval-augmented codebase assistant built with Spring
 <p align="center">
   <sub>
     🌐 <strong>Live App:</strong> <a href="https://gitbot.in">gitbot.in</a> &nbsp;•&nbsp;
-    🎥 <strong>Video Walkthrough:</strong> <a href="#demo">Watch Demonstration</a> &nbsp;•&nbsp;
-    📦 <strong>Repository:</strong> <a href="https://github.com/ManitGitUser/GitBot">ManitGitUser/GitBot</a> &nbsp;•&nbsp;
+    🎥 <strong>Video Walkthrough:</strong> <a href="https://drive.google.com/file/d/1ak5TM7CrnWsm-iVqQy-aKD6-wxf3EWm1/view?usp=sharing">Watch Demonstration</a> &nbsp;•&nbsp;
     📄 <strong>License:</strong> <a href="LICENSE.md">MIT</a>
   </sub>
 </p>
@@ -14,10 +13,12 @@ GitBot is a full-stack, retrieval-augmented codebase assistant built with Spring
 <a id="demo"></a>
 <div align="center">
   <sub>🎥 <strong>Product Demonstration Walkthrough</strong> (Full features &amp; live codebase conversation)</sub>
+  <br/><br/>
+  <a href="https://drive.google.com/file/d/1ak5TM7CrnWsm-iVqQy-aKD6-wxf3EWm1/view?usp=sharing">
+    <img src="docs/demo-thumbnail.png" alt="GitBot Walkthrough Video Demonstration" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
+  </a>
   <br/>
-  <video src="docs/gitbot-demonstration.mp4" controls="controls" width="100%" style="max-width: 100%; border-radius: 8px; margin-top: 8px;">
-    Your browser does not support the video tag.
-  </video>
+  <sub>▶️ <em>Click the preview above to watch the full walkthrough demonstration video (2 min 21 sec)</em> &nbsp;•&nbsp; <a href="https://drive.google.com/file/d/1ak5TM7CrnWsm-iVqQy-aKD6-wxf3EWm1/view?usp=sharing">Open Video on Google Drive ↗</a></sub>
 </div>
 
 ---
@@ -358,6 +359,7 @@ GitBot/
 ├── docker/
 │   └── postgres/                        # Postgres extensions and relational migrations
 ├── docs/
+│   ├── demo-thumbnail.png               # Demonstration video preview poster card
 │   ├── gitbot-demonstration.mp4         # Demonstration video
 │   ├── gitbot-hld.svg                   # High-Level Design architecture
 │   ├── gitbot-lld.svg                   # Low-Level Design component architecture
